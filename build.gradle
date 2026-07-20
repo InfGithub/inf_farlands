@@ -39,13 +39,13 @@ runs {
 
     client {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        jvmArguments "-javaagent:${layout.projectDirectory.file('build/libs/inf_farlands-1.0.0.jar').asFile.absolutePath}"
+        jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
     }
 
     server {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         argument '--nogui'
-        jvmArguments "-javaagent:${layout.projectDirectory.file('build/libs/inf_farlands-1.0.0.jar').asFile.absolutePath}"
+        jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
     }
 
     gameTestServer {
