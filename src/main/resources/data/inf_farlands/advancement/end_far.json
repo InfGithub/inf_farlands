@@ -1,0 +1,75 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancements.inf_farlands.end_far.title"
+    },
+    "description": {
+      "translate": "advancements.inf_farlands.end_far.description"
+    },
+    "icon": {
+      "id": "minecraft:end_stone"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "inf_farlands:root",
+  "criteria": {
+    "end_farlands_x": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "x": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_x_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "x": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_z": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "z": { "max": -12550820 } }
+          }
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "end_farlands_x",
+      "end_farlands_x_neg",
+      "end_farlands_z",
+      "end_farlands_z_neg"
+    ]
+  ],
+  "rewards": {
+    "experience": 500
+  }
+}

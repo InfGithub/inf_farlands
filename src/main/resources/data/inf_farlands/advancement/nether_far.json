@@ -1,0 +1,75 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancements.inf_farlands.nether_far.title"
+    },
+    "description": {
+      "translate": "advancements.inf_farlands.nether_far.description"
+    },
+    "icon": {
+      "id": "minecraft:netherrack"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "inf_farlands:root",
+  "criteria": {
+    "nether_farlands_x": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "x": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_x_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "x": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_z": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "z": { "max": -12550820 } }
+          }
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "nether_farlands_x",
+      "nether_farlands_x_neg",
+      "nether_farlands_z",
+      "nether_farlands_z_neg"
+    ]
+  ],
+  "rewards": {
+    "experience": 500
+  }
+}

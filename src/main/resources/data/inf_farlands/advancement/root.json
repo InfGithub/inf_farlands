@@ -1,0 +1,168 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancements.inf_farlands.root.title"
+    },
+    "description": {
+      "translate": "advancements.inf_farlands.root.description"
+    },
+    "icon": {
+      "id": "minecraft:bedrock"
+    },
+    "background": "minecraft:textures/block/end_stone.png",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "overworld_farlands_x": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:overworld",
+            "position": { "x": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "overworld_farlands_x_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:overworld",
+            "position": { "x": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "overworld_farlands_z": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:overworld",
+            "position": { "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "overworld_farlands_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:overworld",
+            "position": { "z": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_x": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "x": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_x_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "x": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_z": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "nether_farlands_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_nether",
+            "position": { "z": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_x": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "x": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_x_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "x": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_z": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "end_farlands_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "dimension": "minecraft:the_end",
+            "position": { "z": { "max": -12550820 } }
+          }
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "overworld_farlands_x",
+      "overworld_farlands_x_neg",
+      "overworld_farlands_z",
+      "overworld_farlands_z_neg",
+      "nether_farlands_x",
+      "nether_farlands_x_neg",
+      "nether_farlands_z",
+      "nether_farlands_z_neg",
+      "end_farlands_x",
+      "end_farlands_x_neg",
+      "end_farlands_z",
+      "end_farlands_z_neg"
+    ]
+  ]
+}

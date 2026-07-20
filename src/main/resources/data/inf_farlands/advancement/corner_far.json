@@ -1,0 +1,71 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancements.inf_farlands.corner_far.title"
+    },
+    "description": {
+      "translate": "advancements.inf_farlands.corner_far.description"
+    },
+    "icon": {
+      "id": "minecraft:obsidian"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "inf_farlands:root",
+  "criteria": {
+    "corner_x_pos_z_pos": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "position": { "x": { "min": 12550820 }, "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "corner_x_pos_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "position": { "x": { "min": 12550820 }, "z": { "max": -12550820 } }
+          }
+        }
+      }
+    },
+    "corner_x_neg_z_pos": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "position": { "x": { "max": -12550820 }, "z": { "min": 12550820 } }
+          }
+        }
+      }
+    },
+    "corner_x_neg_z_neg": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "position": { "x": { "max": -12550820 }, "z": { "max": -12550820 } }
+          }
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "corner_x_pos_z_pos",
+      "corner_x_pos_z_neg",
+      "corner_x_neg_z_pos",
+      "corner_x_neg_z_neg"
+    ]
+  ],
+  "rewards": {
+    "experience": 1000
+  }
+}
