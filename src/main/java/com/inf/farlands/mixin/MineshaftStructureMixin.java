@@ -24,7 +24,7 @@ public class MineshaftStructureMixin {
         int cx = context.chunkPos().x;
         int cz = context.chunkPos().z;
         int max = FarLandsConstants.MAX_CHUNK;
-        if (cx > max || cx < -max || cz > max || cz < -max) {
+        if (cx > max || cx < -(max + 1) || cz > max || cz < -(max + 1)) {
             cir.setReturnValue(Optional.empty());
         }
     }

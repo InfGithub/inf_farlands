@@ -3,11 +3,9 @@ package com.inf.farlands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import java.util.List;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -45,7 +43,6 @@ public class FarlandsCommand {
                         )
                     )
                 ))
-                .then(Commands.literal("test").executes(ctx -> { runTestCommand(ctx.getSource()); return 1; }))
                 .then(Commands.literal("dump").executes(ctx -> { dump(ctx.getSource()); return 1; }))
         );
     }
@@ -53,11 +50,8 @@ public class FarlandsCommand {
     private static void showInfo(CommandSourceStack src) {
         WorldBorder border = src.getLevel().getWorldBorder();
         src.sendSuccess(() -> Component.literal(
-            "Config: enableFarLands=" + Config.enableFarLands +
-            " octaveAccelThreshold=" + Config.octaveAccelThreshold +
-            " accelMultiplier=" + Config.accelMultiplier +
+            "Config: betaTerrain=" + Config.betaTerrain +
             " borderAbsoluteMax=" + Config.borderAbsoluteMax +
-            " verticalViewDistance=" + Config.verticalViewDistance +
             "\nWorldBorder: size=" + border.getSize() +
             " absMax=" + border.getAbsoluteMaxSize() +
             " minX=" + border.getMinX() + " maxX=" + border.getMaxX()
@@ -81,15 +75,6 @@ public class FarlandsCommand {
             player.getDisplayName(), String.format("%.2f", x), String.format("%.2f", y), String.format("%.2f", z)), true);
     }
 
-    private static void runTestCommand(CommandSourceStack src) {
-        ServerLevel level = src.getLevel();
-        ServerPlayer player = src.getPlayer();
-        List<String> results = runTests(level, player);
-        for (String line : results) {
-            src.sendSuccess(() -> Component.literal(line), false);
-        }
-    }
-
     private static void dump(CommandSourceStack src) throws CommandSyntaxException {
         ServerPlayer player = src.getPlayerOrException();
         WorldBorder border = player.serverLevel().getWorldBorder();
@@ -102,7 +87,4 @@ public class FarlandsCommand {
     }
 
 
-    private static List<String> runTests(ServerLevel level, ServerPlayer player) {
-        return List.of("Tests not implemented.");
-    }
 }

@@ -1,6 +1,7 @@
 package com.inf.farlands.mixin;
 
 import com.inf.farlands.HashUtil;
+import com.inf.farlands.InfFarlands;
 import com.inf.farlands.IntBlockPos;
 import com.inf.farlands.IntSectionPos;
 import net.minecraft.core.BlockPos;
@@ -44,21 +45,21 @@ public abstract class SectionPosMixin {
     @Overwrite
     public static int x(long packed) {
         IntSectionPos p = HashUtil.sectionLookup.get(packed);
-        if (p != null) return p.x;
+        if (p != null) { p.lastAccess = InfFarlands.getServerTickCount(); return p.x; }
         return (int)(packed >> 42);
     }
 
     @Overwrite
     public static int y(long packed) {
         IntSectionPos p = HashUtil.sectionLookup.get(packed);
-        if (p != null) return p.y;
+        if (p != null) { p.lastAccess = InfFarlands.getServerTickCount(); return p.y; }
         return (int)(packed << 44 >> 44);
     }
 
     @Overwrite
     public static int z(long packed) {
         IntSectionPos p = HashUtil.sectionLookup.get(packed);
-        if (p != null) return p.z;
+        if (p != null) { p.lastAccess = InfFarlands.getServerTickCount(); return p.z; }
         return (int)(packed << 22 >> 42);
     }
 

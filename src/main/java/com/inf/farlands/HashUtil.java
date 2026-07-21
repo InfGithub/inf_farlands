@@ -18,30 +18,11 @@ public class HashUtil {
     public static final Map<Long, IntBlockPos> blockLookup = new ConcurrentHashMap<>();
     public static final Map<Long, IntSectionPos> sectionLookup = new ConcurrentHashMap<>();
 
-    /** Drop half the side-channel entries. Called periodically to bound memory. */
-    public static void trimLookups() {
-        int blockSize = blockLookup.size();
-        int sectionSize = sectionLookup.size();
-        if (blockSize > 100_000) {
-            var it = blockLookup.entrySet().iterator();
-            int target = blockSize / 2;
-            int count = 0;
-            while (it.hasNext() && count < target) {
-                it.next();
-                it.remove();
-                count++;
-            }
-        }
-        if (sectionSize > 100_000) {
-            var it = sectionLookup.entrySet().iterator();
-            int target = sectionSize / 2;
-            int count = 0;
-            while (it.hasNext() && count < target) {
-                it.next();
-                it.remove();
-                count++;
-            }
-        }
+    /** Drop entries not accessed within the last 600 ticks. */
+    public static void trimLookups(long currentTick) {
+        long cutoff = currentTick - 600;
+        blockLookup.clear();
+        sectionLookup.values().removeIf(p -> p.lastAccess < cutoff);
     }
 
     // ---- Reflection-based access to LayerLightSectionStorage protected methods ----

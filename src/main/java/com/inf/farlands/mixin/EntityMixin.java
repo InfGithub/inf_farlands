@@ -1,7 +1,11 @@
 package com.inf.farlands.mixin;
 
 import com.inf.farlands.FarLandsConstants;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -64,5 +68,19 @@ public abstract class EntityMixin {
     )
     private double skipZClampOnLoad(double value, double min, double max) {
         return value;
+    }
+
+    @Redirect(
+        method = "playSound(Lnet/minecraft/sounds/SoundEvent;FF)V",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/world/level/Level;playSound(Lnet/minecraft/world/entity/player/Player;DDDLnet/minecraft/sounds/SoundEvent;Lnet/minecraft/sounds/SoundSource;FF)V"
+        )
+    )
+    private void redirectToEntitySound(
+        Level level, Player player, double x, double y, double z,
+        SoundEvent sound, SoundSource source, float volume, float pitch
+    ) {
+        level.playSound(player, (Entity) (Object) this, sound, source, volume, pitch);
     }
 }

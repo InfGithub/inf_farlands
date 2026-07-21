@@ -28,6 +28,7 @@ logs/
 # Dev
 src/generated/
 doc/
+repos/
 CubicChunks2/
 bin/
 nul

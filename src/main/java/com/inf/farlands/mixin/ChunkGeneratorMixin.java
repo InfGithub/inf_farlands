@@ -27,7 +27,7 @@ public class ChunkGeneratorMixin {
         int cx = chunk.getPos().x;
         int cz = chunk.getPos().z;
         int max = FarLandsConstants.MAX_CHUNK;
-        if (cx > max || cx < -max || cz > max || cz < -max) {
+        if (cx > max || cx < -(max + 1) || cz > max || cz < -(max + 1)) {
             ci.cancel();
         }
     }

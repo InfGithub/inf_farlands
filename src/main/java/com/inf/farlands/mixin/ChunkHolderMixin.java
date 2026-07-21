@@ -41,12 +41,4 @@ public class ChunkHolderMixin {
             players.forEach(player -> player.connection.send(packet));
         }
     }
-
-    /** Skip broadcastChanges when column sections are cleared */
-    @Inject(method = "broadcastChanges", at = @At("HEAD"), cancellable = true)
-    private void skipIfSectionsCleared(net.minecraft.world.level.chunk.LevelChunk chunk, CallbackInfo ci) {
-        if (chunk.getSections().length == 0) {
-            ci.cancel();
-        }
-    }
 }

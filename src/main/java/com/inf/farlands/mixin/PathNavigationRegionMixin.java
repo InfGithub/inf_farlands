@@ -28,9 +28,9 @@ public class PathNavigationRegionMixin {
         long newX = (long) self.getX() + dx;
         long newZ = (long) self.getZ() + dz;
         if (newX > MAX_BLOCK) newX = MAX_BLOCK;
-        else if (newX < -MAX_BLOCK) newX = -MAX_BLOCK;
+        else if (newX < Integer.MIN_VALUE) newX = Integer.MIN_VALUE;
         if (newZ > MAX_BLOCK) newZ = MAX_BLOCK;
-        else if (newZ < -MAX_BLOCK) newZ = -MAX_BLOCK;
+        else if (newZ < Integer.MIN_VALUE) newZ = Integer.MIN_VALUE;
         long newY = (long) self.getY() + dy;
         return new BlockPos((int) newX, (int) newY, (int) newZ);
     }

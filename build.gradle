@@ -64,6 +64,7 @@ configurations {
 dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
     implementation 'org.ow2.asm:asm:9.5'
+
 }
 
 tasks.withType(ProcessResources).configureEach {

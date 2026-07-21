@@ -12,7 +12,6 @@
     "ChunkHolderMixin",
     "ClientPacketListenerMixin",
     "FriendlyByteBufMixin",
-    "PerlinNoiseMixin",
     "WorldBorderMixin",
     "MinecraftServerMixin",
     "PlayerMixin",
@@ -36,7 +35,20 @@
     "PathNavigationMixin",
     "PathNavigationRegionMixin",
     "LevelReaderMixin",
-    "NaturalSpawnerMixin"
+    "NaturalSpawnerMixin",
+    "ListenerMixin",
+    "SoundEngineMixin",
+    "EntityBoundSoundInstanceMixin",
+    "BeeSoundInstanceMixin",
+    "MinecartSoundInstanceMixin",
+    "ElytraOnPlayerSoundInstanceMixin",
+    "GuardianAttackSoundInstanceMixin",
+    "SnifferSoundInstanceMixin",
+    "VoxelShapeMixin",
+    "NoiseChunkMixin",
+    "LevelRendererAccessor",
+    "ViewAreaAccessor",
+    "CompiledSectionAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

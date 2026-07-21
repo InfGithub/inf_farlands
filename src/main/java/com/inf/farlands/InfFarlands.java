@@ -2,8 +2,11 @@ package com.inf.farlands;
 
 
 import com.inf.farlands.network.FarLandsSectionBlocksUpdatePacket;
+import com.inf.farlands.terrain.BetaTerrain;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -11,6 +14,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -21,12 +26,18 @@ public class InfFarlands {
 
     public static final String MODID = "inf_farlands";
 
-    private int tickCounter = 0;
+    private static volatile int tickCounter = 0;
     private static final int TRIM_INTERVAL = 200;
+
+    public static long getServerTickCount() {
+        return tickCounter;
+    }
 
     public InfFarlands(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modBus.addListener(this::registerPayloads);
+        NeoForge.EVENT_BUS.addListener(this::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(this::onOverworldLoad);
         NeoForge.EVENT_BUS.addListener(this::onServerTick);
         NeoForge.EVENT_BUS.addListener(this::onClientTick);
     }
@@ -46,11 +57,21 @@ public class InfFarlands {
 
     }
 
+    private void onOverworldLoad(LevelEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel sl && sl.dimension() == Level.OVERWORLD) {
+            BetaTerrain.initialize(sl.getSeed());
+        }
+    }
+
+    private void onServerStarted(ServerStartedEvent event) {
+        BetaTerrain.initialize(event.getServer().overworld().getSeed());
+    }
+
     private void onServerTick(ServerTickEvent.Post event) {
-        if (++tickCounter % TRIM_INTERVAL == 0) HashUtil.trimLookups();
+        if (++tickCounter % TRIM_INTERVAL == 0) HashUtil.trimLookups(tickCounter);
     }
 
     private void onClientTick(ClientTickEvent.Post event) {
-        if (tickCounter % TRIM_INTERVAL == 0) HashUtil.trimLookups();
+        if (++tickCounter % TRIM_INTERVAL == 0) HashUtil.trimLookups(tickCounter);
     }
 }

@@ -18,15 +18,17 @@ Restores the Far Lands in 1.21.1 NeoForge.
 ./gradlew build
 ```
 
-Output: `build/libs/inf_farlands-1.0.2.jar`
+Output: `build/libs/inf_farlands-1.x.x.jar`
 
 ## Features
 
-Pushes the x/z world border to ±2,147,483,647 blocks while keeping
-the game playable.
+- Pushes the x/z world border to ±2,147,483,647 blocks.
 
-Fixes terrain generation, entities, and lighting at extreme coordinates
-as much as possible.
+- Fixes features, entities, and lighting at extreme coordinates as much as
+  possible.
+
+- Ports Beta 1.7.3 noise as accurately as possible; toggleable via config
+  option.
 
 ---
 
@@ -49,7 +51,7 @@ Known incompatibilities:
 
 The mod includes a non-critical Java Agent that helps with
 structure generation. To enable it, add the JVM argument:
-`-javaagent:inf_farlands-1.0.2.jar`.
+`-javaagent:inf_farlands-1.x.x.jar`.
 
 ---
 

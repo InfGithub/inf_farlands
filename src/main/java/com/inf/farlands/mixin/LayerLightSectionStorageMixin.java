@@ -67,4 +67,9 @@ public abstract class LayerLightSectionStorageMixin {
             lightLevel
         );
     }
+
+    @Overwrite
+    protected boolean lightOnInSection(long sectionPos) {
+        return HashUtil.callGetDataLayer(this, sectionPos, true) != null;
+    }
 }
