@@ -29,6 +29,7 @@ logs/
 src/generated/
 doc/
 repos/
+libs/
 CubicChunks2/
 bin/
 nul

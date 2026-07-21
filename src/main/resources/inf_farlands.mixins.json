@@ -46,6 +46,7 @@
     "SnifferSoundInstanceMixin",
     "VoxelShapeMixin",
     "NoiseChunkMixin",
+    "FlowingFluidMixin",
     "LevelRendererAccessor",
     "ViewAreaAccessor",
     "CompiledSectionAccessor"
