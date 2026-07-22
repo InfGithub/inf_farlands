@@ -12,6 +12,9 @@ import net.minecraft.world.level.lighting.LightEngine;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LightEngine.class)
 public abstract class LightEngineMixin {
@@ -27,11 +30,21 @@ public abstract class LightEngineMixin {
     @Shadow
     protected abstract void checkNode(long packedPos);
 
+    /**
+     * Refresh side-channel TTL before the lighting engine touches a section position.
+     * ThreadedLevelLightEngine queues tasks asynchronously; section entries must survive
+     * however long the queue backlog is.  TTL is 6000 ticks — this is the safety net.
+     */
+    @Inject(method = "updateSectionStatus", at = @At("HEAD"))
+    private void refreshSectionLastAccess(SectionPos pos, boolean isQueueEmpty, CallbackInfo ci) {
+        SectionPos.x(pos.asLong()); // triggers lastAccess = tickCounter in SectionPosMixin.x()
+    }
+
     @Overwrite
     public void checkBlock(BlockPos pos) {
         IntBlockPos ibp = new IntBlockPos(pos);
         long key = HashUtil.hashPos((long)ibp.x, (long)ibp.y, (long)ibp.z);
-        HashUtil.blockLookup.put(key, ibp);
+        HashUtil.putBlock(key, ibp);
         this.blockNodesToCheck.add(key);
     }
 
@@ -71,7 +84,7 @@ public abstract class LightEngineMixin {
     public int getLightValue(BlockPos levelPos) {
         IntBlockPos ibp = new IntBlockPos(levelPos);
         long key = HashUtil.hashPos((long)ibp.x, (long)ibp.y, (long)ibp.z);
-        HashUtil.blockLookup.put(key, ibp);
+        HashUtil.putBlock(key, ibp);
         long secKey = SectionPos.asLong(
             SectionPos.blockToSectionCoord(ibp.x),
             SectionPos.blockToSectionCoord(ibp.y),

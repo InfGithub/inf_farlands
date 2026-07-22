@@ -4,6 +4,7 @@ import com.inf.farlands.HashUtil;
 import com.inf.farlands.InfFarlands;
 import com.inf.farlands.IntBlockPos;
 import com.inf.farlands.IntSectionPos;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
@@ -22,14 +23,14 @@ public abstract class SectionPosMixin {
         int y = ((SectionPos)(Object)this).y();
         int z = ((SectionPos)(Object)this).z();
         long key = hashSection((long)x, (long)y, (long)z);
-        HashUtil.sectionLookup.putIfAbsent(key, new IntSectionPos(x, y, z));
+        HashUtil.putSection(key, new IntSectionPos(x, y, z));
         return key;
     }
 
     @Overwrite
     public static long asLong(int x, int y, int z) {
         long key = hashSection((long)x, (long)y, (long)z);
-        HashUtil.sectionLookup.putIfAbsent(key, new IntSectionPos(x, y, z));
+        HashUtil.putSection(key, new IntSectionPos(x, y, z));
         return key;
     }
 
@@ -44,30 +45,29 @@ public abstract class SectionPosMixin {
 
     @Overwrite
     public static int x(long packed) {
-        IntSectionPos p = HashUtil.sectionLookup.get(packed);
+        IntSectionPos p = HashUtil.getSection(packed);
         if (p != null) { p.lastAccess = InfFarlands.getServerTickCount(); return p.x; }
         return (int)(packed >> 42);
     }
 
     @Overwrite
     public static int y(long packed) {
-        IntSectionPos p = HashUtil.sectionLookup.get(packed);
+        IntSectionPos p = HashUtil.getSection(packed);
         if (p != null) { p.lastAccess = InfFarlands.getServerTickCount(); return p.y; }
         return (int)(packed << 44 >> 44);
     }
 
     @Overwrite
     public static int z(long packed) {
-        IntSectionPos p = HashUtil.sectionLookup.get(packed);
+        IntSectionPos p = HashUtil.getSection(packed);
         if (p != null) { p.lastAccess = InfFarlands.getServerTickCount(); return p.z; }
         return (int)(packed << 22 >> 42);
     }
 
     @Overwrite
     public static SectionPos of(long packed) {
-        IntSectionPos p = HashUtil.sectionLookup.get(packed);
-        if (p != null) return SectionPos.of(p.x, p.y, p.z);
-        return SectionPos.of(x(packed), y(packed), z(packed));
+        IntSectionPos p = getSectionPos(packed);
+        return SectionPos.of(p.x, p.y, p.z);
     }
 
     // ---- Offset with side channel ----
@@ -79,52 +79,52 @@ public abstract class SectionPosMixin {
 
     @Overwrite
     public static long offset(long packed, int dx, int dy, int dz) {
-        IntSectionPos p = HashUtil.sectionLookup.get(packed);
-        int nx, ny, nz;
-        if (p != null) { nx = p.x + dx; ny = p.y + dy; nz = p.z + dz; }
-        else { nx = x(packed) + dx; ny = y(packed) + dy; nz = z(packed) + dz; }
+        IntSectionPos p = getSectionPos(packed);
+        int nx = p.x + dx, ny = p.y + dy, nz = p.z + dz;
         long key = hashSection((long)nx, (long)ny, (long)nz);
-        HashUtil.sectionLookup.put(key, new IntSectionPos(nx, ny, nz));
+        HashUtil.putSection(key, new IntSectionPos(nx, ny, nz));
         return key;
     }
 
     // ---- blockToSection: uses blockLookup to resolve block-level key ----
 
+    // === method3: block-level key → IntBlockPos ===
+    private static IntBlockPos getBlockPos(long key) {
+        IntBlockPos bp = HashUtil.getBlock(key);
+        return bp != null ? bp
+            : new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
+    }
+
     @Overwrite
     public static long blockToSection(long levelPos) {
-        IntBlockPos bp = HashUtil.blockLookup.get(levelPos);
-        int sx, sy, sz;
-        if (bp != null) {
-            sx = bp.x >> 4;
-            sy = bp.y >> 4;
-            sz = bp.z >> 4;
-        } else {
-            sx = BlockPos.getX(levelPos) >> 4;
-            sy = BlockPos.getY(levelPos) >> 4;
-            sz = BlockPos.getZ(levelPos) >> 4;
-        }
+        IntBlockPos bp = getBlockPos(levelPos);
+        int sx = bp.x >> 4, sy = bp.y >> 4, sz = bp.z >> 4;
         long key = hashSection((long)sx, (long)sy, (long)sz);
-        HashUtil.sectionLookup.put(key, new IntSectionPos(sx, sy, sz));
+        HashUtil.putSection(key, new IntSectionPos(sx, sy, sz));
         return key;
+    }
+
+    // === method3: section-level key → IntSectionPos ===
+    private static IntSectionPos getSectionPos(long key) {
+        IntSectionPos sp = HashUtil.getSection(key);
+        return sp != null ? sp
+            : new IntSectionPos(x(key), y(key), z(key));
     }
 
     // ---- getZeroNode: extract column key from section key ----
 
     @Overwrite
     public static long getZeroNode(long packed) {
-        IntSectionPos p = HashUtil.sectionLookup.get(packed);
-        long cx, cz;
-        if (p != null) { cx = (long)p.x; cz = (long)p.z; }
-        else { cx = (long)x(packed); cz = (long)z(packed); }
-        long key = hashSection(cx, 0, cz);
-        HashUtil.sectionLookup.put(key, new IntSectionPos((int)cx, 0, (int)cz));
+        IntSectionPos p = getSectionPos(packed);
+        long key = hashSection((long)p.x, 0, (long)p.z);
+        HashUtil.putSection(key, new IntSectionPos(p.x, 0, p.z));
         return key;
     }
 
     @Overwrite
     public static long getZeroNode(int x, int z) {
         long key = hashSection((long)x, 0, (long)z);
-        HashUtil.sectionLookup.put(key, new IntSectionPos(x, 0, z));
+        HashUtil.putSection(key, new IntSectionPos(x, 0, z));
         return key;
     }
 
@@ -181,4 +181,12 @@ public abstract class SectionPosMixin {
     public int maxBlockY() { return (y() << 4) + 15; }
     @Overwrite
     public int maxBlockZ() { return (z() << 4) + 15; }
+
+    // ---- aroundAndAtBlockPos: replace getX(long) with CHM lookup ----
+
+    @Overwrite
+    public static void aroundAndAtBlockPos(long pos, LongConsumer consumer) {
+        IntBlockPos bp = getBlockPos(pos);
+        SectionPos.aroundAndAtBlockPos(new BlockPos(bp.x, bp.y, bp.z), consumer);
+    }
 }

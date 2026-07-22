@@ -9,11 +9,17 @@ import org.spongepowered.asm.mixin.Overwrite;
 @Mixin(BlockPos.MutableBlockPos.class)
 public abstract class MutableBlockPosMixin {
 
+    // === method3: block-level key → IntBlockPos ===
+    private static IntBlockPos getBlockPos(long key) {
+        IntBlockPos bp = HashUtil.getBlock(key);
+        return bp != null ? bp
+            : new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
+    }
+
     @Overwrite
     public BlockPos.MutableBlockPos set(long packedPos) {
-        IntBlockPos pos = HashUtil.blockLookup.get(packedPos);
+        IntBlockPos pos = getBlockPos(packedPos);
         BlockPos.MutableBlockPos self = (BlockPos.MutableBlockPos)(Object) this;
-        if (pos != null) return self.set(pos.x, pos.y, pos.z);
-        return self.set(BlockPos.getX(packedPos), BlockPos.getY(packedPos), BlockPos.getZ(packedPos));
+        return self.set(pos.x, pos.y, pos.z);
     }
 }

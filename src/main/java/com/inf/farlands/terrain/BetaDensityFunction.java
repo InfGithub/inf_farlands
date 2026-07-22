@@ -38,11 +38,11 @@ public class BetaDensityFunction implements DensityFunction.SimpleFunction {
 
             ChunkAccess chunk = BetaTerrain.getCurrentChunk();
             if (chunk != null) {
+                // Beta biomes are 2D; query at sea level to avoid cave biomes.
                 Holder<Biome> holder = chunk.getNoiseBiome(
-                    QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z));
+                    QuartPos.fromBlock(x), QuartPos.fromBlock(63), QuartPos.fromBlock(z));
                 if (holder != null) {
-                    Biome biome = holder.value();
-                    Biome.ClimateSettings cs = biome.getModifiedClimateSettings();
+                    Biome.ClimateSettings cs = holder.value().getModifiedClimateSettings();
                     cachedTemp = cs.temperature();
                     cachedHum = cs.downfall();
                 }

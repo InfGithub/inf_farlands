@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.*;
 import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.util.AbortableIterationConsumer;
 import net.minecraft.world.level.entity.EntityAccess;
 import net.minecraft.world.level.entity.EntitySection;
@@ -24,15 +25,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(EntitySectionStorage.class)
 public abstract class EntitySectionStorageMixin<T extends EntityAccess> {
 
-    @Shadow
-    private LongSortedSet sectionIds;
-    @Shadow
-    private Long2ObjectMap<EntitySection<T>> sections;
+    @Shadow private LongSortedSet sectionIds;
+    @Shadow private Long2ObjectMap<EntitySection<T>> sections;
 
-    @Unique
-    private final Int2ObjectMap<LongSet> sectionsByX = new Int2ObjectOpenHashMap<>();
-    @Unique
-    private final Long2IntMap sectionXByKey = new Long2IntOpenHashMap();
+    @Unique private final Int2ObjectMap<LongSet> sectionsByX = new Int2ObjectOpenHashMap<>();
+    @Unique private final Long2IntMap sectionXByKey = new Long2IntOpenHashMap();
+
+    // === method3: section-level key → IntSectionPos ===
+    private static IntSectionPos getSectionPos(long key) {
+        IntSectionPos sp = HashUtil.getSection(key);
+        return sp != null ? sp
+            : new IntSectionPos(SectionPos.x(key), SectionPos.y(key), SectionPos.z(key));
+    }
 
     /** Register section in X-index when created. */
     @Inject(method = "createSection", at = @At("TAIL"))
@@ -70,13 +74,8 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> {
             if (keys == null) continue;
             for (long key : keys) {
                 int sy, sz;
-                IntSectionPos sp = HashUtil.sectionLookup.get(key);
-                if (sp != null) {
-                    sy = sp.y; sz = sp.z;
-                } else {
-                    sy = SectionPos.y(key);
-                    sz = SectionPos.z(key);
-                }
+                IntSectionPos sp = getSectionPos(key);
+                sy = sp.y; sz = sp.z;
                 if (sy >= minSecY && sy <= maxSecY && sz >= minSecZ && sz <= maxSecZ) {
                     EntitySection<T> section = this.sections.get(key);
                     if (section != null && !section.isEmpty() && section.getStatus().isAccessible()) {
@@ -90,8 +89,7 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> {
     /** X-coordinate of a section key, avoiding the side-channel on stale entries. */
     @Unique
     private int getX(long key) {
-        IntSectionPos sp = HashUtil.sectionLookup.get(key);
-        return sp != null ? sp.x : SectionPos.x(key);
+        return getSectionPos(key).x;
     }
 
     /**
@@ -103,13 +101,16 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> {
         LongIterator it = this.sectionIds.iterator();
         while (it.hasNext()) {
             long key = it.nextLong();
-            IntSectionPos sp = HashUtil.sectionLookup.get(key);
-            if (sp != null) {
-                if (sp.x == cx && sp.z == cz) result.add(key);
-            } else {
-                if (SectionPos.x(key) == cx && SectionPos.z(key) == cz) result.add(key);
-            }
+            IntSectionPos sp = getSectionPos(key);
+            if (sp.x == cx && sp.z == cz) result.add(key);
         }
         return result;
+    }
+
+    /** Replace SectionPos.x/z(long) with CHM lookup. */
+    @Overwrite
+    private static long getChunkKeyFromSectionKey(long pos) {
+        IntSectionPos sp = getSectionPos(pos);
+        return ChunkPos.asLong(sp.x, sp.z);
     }
 }

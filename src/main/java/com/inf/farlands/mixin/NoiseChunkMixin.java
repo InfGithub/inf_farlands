@@ -6,26 +6,18 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import net.minecraft.world.level.levelgen.NoiseRouter;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(NoiseChunk.class)
 public abstract class NoiseChunkMixin {
 
-    @Shadow
-    protected abstract DensityFunction wrap(DensityFunction df);
-
-    @Redirect(
-        method = "<init>",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;finalDensity()Lnet/minecraft/world/level/levelgen/DensityFunction;"
-        )
-    )
+    @Redirect(method = "<init>", at = @At(
+        value = "INVOKE",
+        target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;finalDensity()Lnet/minecraft/world/level/levelgen/DensityFunction;"
+    ))
     private DensityFunction replaceFinalDensity(NoiseRouter router) {
-        DensityFunction original = router.finalDensity();
-        if (!Config.betaTerrain) return original;
+        if (!Config.betaTerrain) return router.finalDensity();
         return new BetaDensityFunction();
     }
 }
