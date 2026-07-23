@@ -39,13 +39,13 @@ runs {
 
     client {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
+        // jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
     }
 
     server {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         argument '--nogui'
-        jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
+        // jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
     }
 
     gameTestServer {
@@ -64,7 +64,7 @@ configurations {
 dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
     implementation 'org.ow2.asm:asm:9.5'
-    localRuntime 'spark:spark:1.10.124-neoforge'
+    // localRuntime 'spark:spark:1.10.124-neoforge'
 
 }
 

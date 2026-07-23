@@ -36,3 +36,5 @@ nul
 .nul
 the_log.txt
 stderr.txt
+
+src/.main/
