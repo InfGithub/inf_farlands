@@ -8,8 +8,14 @@ import org.spongepowered.asm.mixin.Overwrite;
 @Mixin(MinecraftServer.class)
 public class MinecraftServerMixin {
 
+    // 方法：
+    // public int getAbsoluteMaxWorldSize() {
+    //     return 29999984;
+    // }
+
+    
     @Overwrite
     public int getAbsoluteMaxWorldSize() {
-        return Config.borderAbsoluteMax;
+        return Config.borderAbsoluteMax - 16; // chunk
     }
 }
