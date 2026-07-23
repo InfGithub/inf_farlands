@@ -5,6 +5,7 @@
   "mixins": [
     "DimensionTypeMixin",
     "EntityMixin",
+    "FlowingFluidMixin",
     "LevelMixin",
     "MinecraftServerMixin",
     "PlayerMixin",

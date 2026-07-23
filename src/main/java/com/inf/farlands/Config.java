@@ -13,10 +13,16 @@ public class Config {
                     Integer.MAX_VALUE,
                     1,
                     Integer.MAX_VALUE);
+    private static final ModConfigSpec.BooleanValue DISABLE_FLUID_SPREAD = BUILDER.comment(
+            "Completely disable fluid (water/lava) spreading.",
+            "Useful in Far Lands where massive water bodies cause severe TPS drops.")
+            .define("disableFluidSpread", true);
 
     public static int borderAbsoluteMax = Integer.MAX_VALUE;
+    public static boolean disableFluidSpread = true;
 
     static void onLoad(final ModConfigEvent event) {
         borderAbsoluteMax = BORDER_ABSOLUTE_MAX.get();
+        disableFluidSpread = DISABLE_FLUID_SPREAD.get();
     }
 }
