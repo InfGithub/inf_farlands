@@ -18,6 +18,8 @@ public class Config {
             "Useful in Far Lands where massive water bodies cause severe TPS drops.")
             .define("disableFluidSpread", true);
 
+    static final ModConfigSpec SPEC = BUILDER.build();
+
     public static int borderAbsoluteMax = Integer.MAX_VALUE;
     public static boolean disableFluidSpread = true;
 

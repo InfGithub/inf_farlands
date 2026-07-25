@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin;
+package com.inf.farlands.mixin.worldBorder;
 
 import com.inf.farlands.Config;
 

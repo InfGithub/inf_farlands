@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin;
+package com.inf.farlands.mixin.worldBorder;
 
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
