@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin;
+package com.inf.farlands.mixin.worldBorder;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;

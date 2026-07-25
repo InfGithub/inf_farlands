@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin;
+package com.inf.farlands.mixin.worldBorder;
 
 import com.inf.farlands.Config;
 import net.minecraft.server.MinecraftServer;
@@ -10,10 +10,9 @@ public class MinecraftServerMixin {
 
     // 方法：
     // public int getAbsoluteMaxWorldSize() {
-    //     return 29999984;
+    // return 29999984;
     // }
 
-    
     @Overwrite
     public int getAbsoluteMaxWorldSize() {
         return Config.borderAbsoluteMax - 16; // chunk
