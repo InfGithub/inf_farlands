@@ -2,6 +2,10 @@ package com.inf.farlands;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.lang.reflect.Method;
+
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.lighting.LayerLightSectionStorage;
 
 public class HashUtil {
     public static long hashPos(long x, long y, long z) {
@@ -46,5 +50,37 @@ public class HashUtil {
         long cutoff = currentTick - 600;
         blockLookup.clear();
         sectionLookup.values().removeIf(p -> p.lastAccess < cutoff);
+    }
+    // --------------------------------------------
+
+    private static final Method GET_DATA_LAYER;
+    private static final Method GET_DATA_LAYER_TO_WRITE;
+    static {
+        try {
+            GET_DATA_LAYER = LayerLightSectionStorage.class.getDeclaredMethod("getDataLayer", long.class,
+                    boolean.class);
+            GET_DATA_LAYER.setAccessible(true);
+            GET_DATA_LAYER_TO_WRITE = LayerLightSectionStorage.class.getDeclaredMethod("getDataLayerToWrite",
+                    long.class);
+            GET_DATA_LAYER_TO_WRITE.setAccessible(true);
+        } catch (Exception error) {
+            throw new RuntimeException(error);
+        }
+    }
+
+    public static DataLayer callGetDataLayer(Object storage, long key, boolean cached) {
+        try {
+            return (DataLayer) GET_DATA_LAYER.invoke(storage, key, cached);
+        } catch (Exception error) {
+            return null;
+        }
+    }
+
+    public static DataLayer callGetDataLayerToWrite(Object storage, long key) {
+        try {
+            return (DataLayer) GET_DATA_LAYER_TO_WRITE.invoke(storage, key);
+        } catch (Exception error) {
+            return null;
+        }
     }
 }

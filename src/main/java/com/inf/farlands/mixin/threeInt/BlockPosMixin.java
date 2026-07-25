@@ -102,7 +102,12 @@ public abstract class BlockPosMixin {
     @Overwrite
     public long asLong() {
         BlockPos self = (BlockPos) (Object) this;
-        return HashUtil.hashPos((long) self.getX(), (long) self.getY(), (long) self.getZ());
+        int x = self.getX();
+        int y = self.getY();
+        int z = self.getZ();
+        long key = HashUtil.hashPos((long) x, (long) y, (long) z);
+        HashUtil.putBlock(key, new IntBlockPos(x, y, z));
+        return key;
     }
 
     // 方法：
@@ -114,6 +119,8 @@ public abstract class BlockPosMixin {
     // }
     @Overwrite
     public static long asLong(int x, int y, int z) {
-        return HashUtil.hashPos((long) x, (long) y, (long) z);
+        long key = HashUtil.hashPos((long) x, (long) y, (long) z);
+        HashUtil.putBlock(key, new IntBlockPos(x, y, z));
+        return key;
     }
 }
