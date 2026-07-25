@@ -1,5 +1,7 @@
 package com.inf.farlands;
 
+import net.minecraft.core.SectionPos;
+
 public class IntSectionPos {
     public final int x, y, z;
     public volatile long lastAccess;
@@ -42,5 +44,11 @@ public class IntSectionPos {
 
     public IntSectionPos offset(int dx, int dy, int dz) {
         return new IntSectionPos(x + dx, y + dy, z + dz);
+    }
+
+    public static IntSectionPos getSectionPos(long key) {
+        IntSectionPos sp = HashUtil.getSection(key);
+        return sp != null ? sp
+                : new IntSectionPos(SectionPos.x(key), SectionPos.y(key), SectionPos.z(key));
     }
 }

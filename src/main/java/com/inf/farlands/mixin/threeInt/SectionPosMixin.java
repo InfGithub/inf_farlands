@@ -15,21 +15,6 @@ import java.util.Objects;
 
 @Mixin(SectionPos.class)
 public abstract class SectionPosMixin {
-
-    // 2个getPos方法
-
-    private static IntBlockPos getBlockPos(long key) {
-        IntBlockPos bp = HashUtil.getBlock(key);
-        return bp != null ? bp
-                : new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
-    }
-
-    private static IntSectionPos getSectionPos(long key) {
-        IntSectionPos sp = HashUtil.getSection(key);
-        return sp != null ? sp
-                : new IntSectionPos(x(key), y(key), z(key));
-    }
-
     // 哈希
     private static long hashSection(long x, long y, long z) {
         long h = x * 0x9E3779B97F4A7C15L;
@@ -114,7 +99,7 @@ public abstract class SectionPosMixin {
     // }
     @Overwrite
     public static SectionPos of(long packed) {
-        IntSectionPos p = getSectionPos(packed);
+        IntSectionPos p = IntSectionPos.getSectionPos(packed);
         return SectionPos.of(p.x, p.y, p.z);
     }
 
@@ -134,7 +119,7 @@ public abstract class SectionPosMixin {
     // }
     @Overwrite
     public static long offset(long packed, int dx, int dy, int dz) {
-        IntSectionPos p = getSectionPos(packed);
+        IntSectionPos p = IntSectionPos.getSectionPos(packed);
         int nx = p.x + dx, ny = p.y + dy, nz = p.z + dz;
         long key = hashSection((long) nx, (long) ny, (long) nz);
         HashUtil.putSection(key, new IntSectionPos(nx, ny, nz));
@@ -151,7 +136,7 @@ public abstract class SectionPosMixin {
     // }
     @Overwrite
     public static long blockToSection(long levelPos) {
-        IntBlockPos bp = getBlockPos(levelPos);
+        IntBlockPos bp = IntBlockPos.getBlockPos(levelPos);
         int sx = bp.x >> 4, sy = bp.y >> 4, sz = bp.z >> 4;
         long key = hashSection((long) sx, (long) sy, (long) sz);
         HashUtil.putSection(key, new IntSectionPos(sx, sy, sz));
@@ -163,7 +148,7 @@ public abstract class SectionPosMixin {
     // }
     @Overwrite
     public static long getZeroNode(long packed) {
-        IntSectionPos p = getSectionPos(packed);
+        IntSectionPos p = IntSectionPos.getSectionPos(packed);
         long key = hashSection((long) p.x, 0, (long) p.z);
         HashUtil.putSection(key, new IntSectionPos(p.x, 0, p.z));
         return key;
@@ -240,7 +225,7 @@ public abstract class SectionPosMixin {
     // }
     @Overwrite
     public static void aroundAndAtBlockPos(long pos, LongConsumer consumer) {
-        IntBlockPos bp = getBlockPos(pos);
+        IntBlockPos bp = IntBlockPos.getBlockPos(pos);
         SectionPos.aroundAndAtBlockPos(new BlockPos(bp.x, bp.y, bp.z), Objects.requireNonNull(consumer));
     }
 }

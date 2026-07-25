@@ -23,4 +23,10 @@ public class IntBlockPos {
     public IntBlockPos offset(int dx, int dy, int dz) {
         return new IntBlockPos(x + dx, y + dy, z + dz);
     }
+
+    public static IntBlockPos getBlockPos(long key) {
+        IntBlockPos bp = HashUtil.getBlock(key);
+        return bp != null ? bp
+                : new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
+    }
 }

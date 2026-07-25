@@ -51,11 +51,6 @@ public abstract class BlockPosMixin {
         return (int) (packedPos << 64 - Z_OFFSET - PACKED_Z_LENGTH >> 64 - PACKED_Z_LENGTH);
     }
 
-    private static IntBlockPos getBlockPos(long key) {
-        IntBlockPos bp = HashUtil.getBlock(key);
-        return bp != null ? bp : new IntBlockPos(getX(key), getY(key), getZ(key));
-    }
-
     // --------------------------------
 
     // 方法：
@@ -65,7 +60,7 @@ public abstract class BlockPosMixin {
 
     @Overwrite
     public static long offset(long packedPos, int dx, int dy, int dz) {
-        IntBlockPos pos = getBlockPos(packedPos);
+        IntBlockPos pos = IntBlockPos.getBlockPos(packedPos);
         int nx = pos.x + dx;
         int ny = pos.y + dy;
         int nz = pos.z + dz;
@@ -82,7 +77,7 @@ public abstract class BlockPosMixin {
 
     @Overwrite
     public static BlockPos of(long packedPos) {
-        IntBlockPos pos = getBlockPos(packedPos);
+        IntBlockPos pos = IntBlockPos.getBlockPos(packedPos);
         return new BlockPos(pos.x, pos.y, pos.z);
     }
 
@@ -93,7 +88,7 @@ public abstract class BlockPosMixin {
 
     @Overwrite
     public static long getFlatIndex(long packedPos) {
-        IntBlockPos pos = getBlockPos(packedPos);
+        IntBlockPos pos = IntBlockPos.getBlockPos(packedPos);
         return HashUtil.hashPos((long) pos.x, 0, (long) pos.z);
     }
 

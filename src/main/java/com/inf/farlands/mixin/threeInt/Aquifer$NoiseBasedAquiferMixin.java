@@ -18,12 +18,6 @@ import net.minecraft.world.level.block.Blocks;
 
 @Mixin(Aquifer.NoiseBasedAquifer.class)
 public abstract class Aquifer$NoiseBasedAquiferMixin {
-    private static IntBlockPos getBlockPos(long key) {
-        IntBlockPos bp = HashUtil.getBlock(key);
-        return bp != null ? bp
-                : new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
-    }
-
     // protected int getIndex(int gridX, int gridY, int gridZ) {
     // int i = gridX - this.minGridX;
     // int j = gridY - this.minGridY;
@@ -79,7 +73,7 @@ public abstract class Aquifer$NoiseBasedAquiferMixin {
 
     @Overwrite
     private Aquifer.FluidStatus getAquiferStatus(long packedPos) {
-        IntBlockPos bp = getBlockPos(packedPos);
+        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
         int i = gridX(bp.x);
         int j = gridY(bp.y);
         int k = gridZ(bp.z);
@@ -156,7 +150,7 @@ public abstract class Aquifer$NoiseBasedAquiferMixin {
 
                     if (cache != Long.MAX_VALUE) {
                         longPos = cache;
-                        IntBlockPos c = getBlockPos(longPos);
+                        IntBlockPos c = IntBlockPos.getBlockPos(longPos);
                         lx = c.x;
                         ly = c.y;
                         lz = c.z;
