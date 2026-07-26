@@ -11,6 +11,7 @@ import com.inf.farlands.HashUtil;
 import com.inf.farlands.IntBlockPos;
 import com.inf.farlands.IntSectionPos;
 
+import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
 
 @Mixin(LayerLightSectionStorage.class)
@@ -85,6 +86,42 @@ public abstract class LayerLightSectionStorageMixin {
                 for (int dz = -1; dz <= 1; dz++) {
                     this.sectionsAffectedByLightUpdates.add(
                             SectionPos.asLong(sp.x + dx, sp.y + dy, sp.z + dz));
+                }
+            }
+        }
+    }
+
+    @Shadow
+    private Long2ByteMap sectionStates;
+
+    @Shadow
+    protected abstract void putSectionState(long sectionPos, byte sectionState);
+
+    /**
+     * Replace SectionPos.offset in neighbor loop with local-coordinate arithmetic.
+     * SectionPos.offset reads CHM for coordinates; CHM miss at extreme coords
+     * produces garbage that cascades into infinite loops in createDataLayer.
+     */
+    @Overwrite
+    protected void updateSectionStatus(long sectionPos, boolean isEmpty) {
+        byte b0 = this.sectionStates.get(sectionPos);
+        byte b1 = (byte)(!isEmpty ? b0 | 32 : b0 & -33);
+        if (b0 != b1) {
+            this.putSectionState(sectionPos, b1);
+            int i = isEmpty ? -1 : 1;
+            IntSectionPos sp = IntSectionPos.getSectionPos(sectionPos);
+            int sx = sp.x, sy = sp.y, sz = sp.z;
+
+            for (int j = -1; j <= 1; j++) {
+                for (int k = -1; k <= 1; k++) {
+                    for (int l = -1; l <= 1; l++) {
+                        if (j != 0 || k != 0 || l != 0) {
+                            long i1 = SectionPos.asLong(sx + j, sy + k, sz + l);
+                            byte b2 = this.sectionStates.get(i1);
+                            int nc = (b2 & 31) + i;
+                            this.putSectionState(i1, (byte)(b2 & -32 | nc & 31));
+                        }
+                    }
                 }
             }
         }

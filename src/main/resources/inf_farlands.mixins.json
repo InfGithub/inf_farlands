@@ -14,10 +14,11 @@
     "audioOverflowFix.SnifferSoundInstanceMixin",
     "audioOverflowFix.SoundEngineMixin",
 
+    "noise.NoiseBasedChunkGeneratorMixin",
+    "noise.NoiseChunkMixin",
+
     "render.LevelRendererMixin",
     "render.SectionOcclusionGraphMixin",
-
-    "debug.JigsawPlacerMixin",
 
     "threeInt.Aquifer$NoiseBasedAquiferMixin",
     "threeInt.BlockLightEngineMixin",
@@ -29,8 +30,8 @@
     "threeInt.LayerLightSectionStorageMixin",
     "threeInt.LightDebugRendererMixin",
     "threeInt.LightEngineMixin",
-    "threeInt.PersistentEntitySectionManagerMixin",
     "threeInt.MutableBlockPosMixin",
+    "threeInt.PersistentEntitySectionManagerMixin",
     "threeInt.SectionPosMixin",
     "threeInt.SectionStorageMixin",
     "threeInt.SkyLightEngineMixin",
