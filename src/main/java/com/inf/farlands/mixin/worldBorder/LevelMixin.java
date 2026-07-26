@@ -23,6 +23,7 @@ public class LevelMixin {
     @Final
     @Mutable
     private static int MAX_LEVEL_SIZE;
+
     private static void set_MAX_LEVEL_SIZE(int size) {
         MAX_LEVEL_SIZE = size;
     }
@@ -32,8 +33,32 @@ public class LevelMixin {
         set_MAX_LEVEL_SIZE(Config.borderAbsoluteMax);
     }
 
+    // private static boolean isInWorldBoundsHorizontal(BlockPos pos) {
+    // return pos.getX() >= -30000000 && pos.getZ() >= -30000000 && pos.getX() <
+    // 30000000 && pos.getZ() < 30000000;
+    // }
+
     @ModifyConstant(method = "isInWorldBoundsHorizontal", constant = @Constant(intValue = 30000000))
-    private static int modifyWorldBounds(int original) {
+    private static int modifyWorldBoundsP(int original) {
         return Config.borderAbsoluteMax;
+    }
+
+    @ModifyConstant(method = "isInWorldBoundsHorizontal", constant = @Constant(intValue = -30000000))
+    private static int modifyWorldBoundsN(int original) {
+        return ~Config.borderAbsoluteMax;
+    }
+
+    // private static boolean isOutsideSpawnableHeight(int y) {
+    // return y < -20000000 || y >= 20000000;
+    // }
+
+    @ModifyConstant(method = "isOutsideSpawnableHeight", constant = @Constant(intValue = 20000000))
+    private static int modifyWorldBoundsHeightP(int original) {
+        return Config.borderAbsoluteMax;
+    }
+
+    @ModifyConstant(method = "isOutsideSpawnableHeight", constant = @Constant(intValue = -20000000))
+    private static int modifyWorldBoundsHeightN(int original) {
+        return ~Config.borderAbsoluteMax;
     }
 }

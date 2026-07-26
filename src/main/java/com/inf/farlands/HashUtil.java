@@ -15,17 +15,28 @@ public class HashUtil {
         return h;
     }
 
-    public static final Map<Long, IntBlockPos> blockLookup = new ConcurrentHashMap<>();
+    // 双 Map
+
+    private static volatile Map<Long, IntBlockPos> blockLookup = new ConcurrentHashMap<>();
+    private static volatile Map<Long, IntBlockPos> oldBlockLookup;
 
     public static void putBlock(long key, IntBlockPos val) {
         blockLookup.put(key, val);
     }
 
     public static IntBlockPos getBlock(long key) {
-        return blockLookup.get(key);
+        IntBlockPos bp = blockLookup.get(key);
+        if (bp != null) return bp;
+        Map<Long, IntBlockPos> old = oldBlockLookup;
+        return old != null ? old.get(key) : null;
     }
 
-    // --------------------------------------------
+    public static void swapBlockLookup() {
+        oldBlockLookup = blockLookup;
+        blockLookup = new ConcurrentHashMap<>();
+    }
+
+    // ------------------------------------------------------------
 
     public static long hashSection(long x, long y, long z) {
         long h = x * 0x9E3779B97F4A7C15L;
@@ -48,20 +59,21 @@ public class HashUtil {
 
     public static void trimLookups(long currentTick) {
         long cutoff = currentTick - 600;
-        blockLookup.clear();
+        swapBlockLookup();
         sectionLookup.values().removeIf(p -> p.lastAccess < cutoff);
     }
+
     // --------------------------------------------
 
     private static final Method GET_DATA_LAYER;
     private static final Method GET_DATA_LAYER_TO_WRITE;
+
     static {
         try {
-            GET_DATA_LAYER = LayerLightSectionStorage.class.getDeclaredMethod("getDataLayer", long.class,
-                    boolean.class);
+            GET_DATA_LAYER = LayerLightSectionStorage.class.getDeclaredMethod("getDataLayer", long.class, boolean.class);
             GET_DATA_LAYER.setAccessible(true);
-            GET_DATA_LAYER_TO_WRITE = LayerLightSectionStorage.class.getDeclaredMethod("getDataLayerToWrite",
-                    long.class);
+            GET_DATA_LAYER_TO_WRITE = LayerLightSectionStorage.class
+                    .getDeclaredMethod("getDataLayerToWrite", long.class);
             GET_DATA_LAYER_TO_WRITE.setAccessible(true);
         } catch (Exception error) {
             throw new RuntimeException(error);
