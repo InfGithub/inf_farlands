@@ -3,6 +3,20 @@
   "package": "com.inf.farlands.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "audioOverflowFix.BeeSoundInstanceMixin",
+    "audioOverflowFix.ElytraOnPlayerSoundInstanceMixin",
+    "audioOverflowFix.EntityBoundSoundInstanceMixin",
+    "audioOverflowFix.EntityMixin",
+    "audioOverflowFix.GuardianAttackSoundInstanceMixin",
+    "audioOverflowFix.ListenerMixin",
+    "audioOverflowFix.MinecartSoundInstanceMixin",
+    "audioOverflowFix.PlayerMixin",
+    "audioOverflowFix.SnifferSoundInstanceMixin",
+    "audioOverflowFix.SoundEngineMixin",
+
+    "noise.NoiseBasedChunkGeneratorMixin",
+    "noise.NoiseChunkMixin",
+
     "render.LevelRendererMixin",
     "render.SectionOcclusionGraphMixin",
 
@@ -16,8 +30,8 @@
     "threeInt.LayerLightSectionStorageMixin",
     "threeInt.LightDebugRendererMixin",
     "threeInt.LightEngineMixin",
-    "threeInt.PersistentEntitySectionManagerMixin",
     "threeInt.MutableBlockPosMixin",
+    "threeInt.PersistentEntitySectionManagerMixin",
     "threeInt.SectionPosMixin",
     "threeInt.SectionStorageMixin",
     "threeInt.SkyLightEngineMixin",
@@ -33,9 +47,11 @@
     "worldBorder.WorldBorderCommandMixin",
     "worldBorder.WorldBorderMixin",
 
+    "worldOverflowFix.AABBMixin",
     "worldOverflowFix.BoundingBoxMixin",
     "worldOverflowFix.ChunkGeneratorMixin",
     "worldOverflowFix.ClientPacketListenerMixin",
+    "worldOverflowFix.JigsawPlacementMixin",
     "worldOverflowFix.LevelMixin",
     "worldOverflowFix.MineshaftPieces$MineShaftPieceMixin",
     "worldOverflowFix.MineshaftPiecesMixin",
@@ -45,6 +61,7 @@
     "worldOverflowFix.PathNavigationMixin",
     "worldOverflowFix.PathNavigationRegionMixin",
     "worldOverflowFix.PlacedFeatureMixin",
+    "worldOverflowFix.VoxelShapeMixin",
     "worldOverflowFix.WorldGenRegionMixin",
 
     "FlowingFluidMixin"
