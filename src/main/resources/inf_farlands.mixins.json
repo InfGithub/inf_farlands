@@ -3,6 +3,9 @@
   "package": "com.inf.farlands.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "render.LevelRendererMixin",
+    "render.SectionOcclusionGraphMixin",
+
     "threeInt.Aquifer$NoiseBasedAquiferMixin",
     "threeInt.BlockLightEngineMixin",
     "threeInt.BlockLightSectionStorageMixin",
@@ -13,12 +16,13 @@
     "threeInt.LayerLightSectionStorageMixin",
     "threeInt.LightDebugRendererMixin",
     "threeInt.LightEngineMixin",
-    "threeInt.MutableBlockPosMixin",
     "threeInt.PersistentEntitySectionManagerMixin",
+    "threeInt.MutableBlockPosMixin",
     "threeInt.SectionPosMixin",
     "threeInt.SectionStorageMixin",
     "threeInt.SkyLightEngineMixin",
     "threeInt.SkyLightSectionStorageMixin",
+
     "worldBorder.DimensionTypeMixin",
     "worldBorder.EntityMixin",
     "worldBorder.LevelMixin",
@@ -28,6 +32,21 @@
     "worldBorder.WorldBorder$SettingsMixin",
     "worldBorder.WorldBorderCommandMixin",
     "worldBorder.WorldBorderMixin",
+
+    "worldOverflowFix.BoundingBoxMixin",
+    "worldOverflowFix.ChunkGeneratorMixin",
+    "worldOverflowFix.ClientPacketListenerMixin",
+    "worldOverflowFix.LevelMixin",
+    "worldOverflowFix.MineshaftPieces$MineShaftPieceMixin",
+    "worldOverflowFix.MineshaftPiecesMixin",
+    "worldOverflowFix.MineshaftStructureMixin",
+    "worldOverflowFix.NaturalSpawnerMixin",
+    "worldOverflowFix.NoiseBasedChunkGeneratorMixin",
+    "worldOverflowFix.PathNavigationMixin",
+    "worldOverflowFix.PathNavigationRegionMixin",
+    "worldOverflowFix.PlacedFeatureMixin",
+    "worldOverflowFix.WorldGenRegionMixin",
+
     "FlowingFluidMixin"
   ],
   "injectors": {

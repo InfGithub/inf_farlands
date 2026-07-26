@@ -21,7 +21,7 @@ public class IntSectionPos {
     }
 
     public int minBlockX() {
-        return x << 4; // 2^4=16
+        return x << 4;
     }
 
     public int minBlockY() {
@@ -34,11 +34,13 @@ public class IntSectionPos {
 
     public int compareTo(IntSectionPos o) {
         int c = Integer.compare(this.x, o.x);
-        if (c != 0)
+        if (c != 0) {
             return c;
+        }
         c = Integer.compare(this.y, o.y);
-        if (c != 0)
+        if (c != 0) {
             return c;
+        }
         return Integer.compare(this.z, o.z);
     }
 
@@ -48,7 +50,10 @@ public class IntSectionPos {
 
     public static IntSectionPos getSectionPos(long key) {
         IntSectionPos sp = HashUtil.getSection(key);
-        return sp != null ? sp
-                : new IntSectionPos(SectionPos.x(key), SectionPos.y(key), SectionPos.z(key));
+        if (sp != null) {
+            sp.lastAccess = InfFarlands.getServerTickCount();
+            return sp;
+        }
+        return new IntSectionPos(SectionPos.x(key), SectionPos.y(key), SectionPos.z(key));
     }
 }

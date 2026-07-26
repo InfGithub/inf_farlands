@@ -16,8 +16,13 @@ public class ServerGamePacketListenerImplMixin {
     // }
 
     @ModifyConstant(method = "clampHorizontal", constant = @Constant(doubleValue = 3.0E7))
-    private static double modifyHorizontalClamp(double original) {
+    private static double modifyHorizontalClampP(double original) {
         return Config.borderAbsoluteMax;
+    }
+
+    @ModifyConstant(method = "clampHorizontal", constant = @Constant(doubleValue = -3.0E7))
+    private static double modifyHorizontalClampN(double original) {
+        return ~Config.borderAbsoluteMax;
     }
 
     // 方法：
@@ -26,7 +31,12 @@ public class ServerGamePacketListenerImplMixin {
     // }
 
     @ModifyConstant(method = "clampVertical", constant = @Constant(doubleValue = 2.0E7))
-    private static double modifyVerticalClamp(double original) {
+    private static double modifyVerticalClampP(double original) {
         return Config.borderAbsoluteMax;
+    }
+
+    @ModifyConstant(method = "clampVertical", constant = @Constant(doubleValue = -2.0E7))
+    private static double modifyVerticalClampN(double original) {
+        return ~Config.borderAbsoluteMax;
     }
 }

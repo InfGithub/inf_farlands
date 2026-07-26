@@ -15,14 +15,14 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 
 @Mixin(LayerLightSectionStorage.class)
 public abstract class LayerLightSectionStorageMixin {
-    //     protected int getStoredLevel(long levelPos) {
-    //     long i = SectionPos.blockToSection(levelPos);
-    //     DataLayer datalayer = this.getDataLayer(i, true);
-    //     return datalayer.get(
-    //         SectionPos.sectionRelative(BlockPos.getX(levelPos)),
-    //         SectionPos.sectionRelative(BlockPos.getY(levelPos)),
-    //         SectionPos.sectionRelative(BlockPos.getZ(levelPos))
-    //     );
+    // protected int getStoredLevel(long levelPos) {
+    // long i = SectionPos.blockToSection(levelPos);
+    // DataLayer datalayer = this.getDataLayer(i, true);
+    // return datalayer.get(
+    // SectionPos.sectionRelative(BlockPos.getX(levelPos)),
+    // SectionPos.sectionRelative(BlockPos.getY(levelPos)),
+    // SectionPos.sectionRelative(BlockPos.getZ(levelPos))
+    // );
     // }
 
     @Overwrite
@@ -30,9 +30,12 @@ public abstract class LayerLightSectionStorageMixin {
         IntBlockPos pos = IntBlockPos.getBlockPos(levelPos);
         long secKey = SectionPos.blockToSection(levelPos);
         DataLayer dl = HashUtil.callGetDataLayer(this, secKey, true);
-        if (dl == null)
+        if (dl == null) {
             return 15;
-        return dl.get(SectionPos.sectionRelative(pos.x), SectionPos.sectionRelative(pos.y),
+        }
+        return dl.get(
+                SectionPos.sectionRelative(pos.x),
+                SectionPos.sectionRelative(pos.y),
                 SectionPos.sectionRelative(pos.z));
     }
     // protected void setStoredLevel(long levelPos, int lightLevel) {
@@ -58,16 +61,17 @@ public abstract class LayerLightSectionStorageMixin {
         IntBlockPos pos = IntBlockPos.getBlockPos(levelPos);
         long secKey = SectionPos.blockToSection(levelPos);
         DataLayer dl = HashUtil.callGetDataLayerToWrite(this, secKey);
-        if (dl == null)
+        if (dl == null) {
             return;
+        }
         dl.set(SectionPos.sectionRelative(pos.x), SectionPos.sectionRelative(pos.y), SectionPos.sectionRelative(pos.z),
                 lightLevel);
     }
 
-    // @Overwrite
-    // protected boolean lightOnInSection(long sectionPos) {
-    // return HashUtil.callGetDataLayer(this, sectionPos, true) != null;
-    // }
+    @Overwrite
+    protected boolean lightOnInSection(long sectionPos) {
+        return HashUtil.callGetDataLayer(this, sectionPos, true) != null;
+    }
     // 这个方法可能不需要 Mixin
 
     @Shadow
