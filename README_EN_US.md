@@ -20,7 +20,7 @@ Output: `build/libs/inf_farlands-1.x.x.jar`
 
 ## Features
 
-- Pushes the x/z world border to ±2,147,483,647 blocks.
+- Pushes the world border on the X/Y/Z axes to ±2,147,483,647 blocks.
 
 - Highest usable coordinates: ±2,147,483,632 blocks.
 
@@ -28,7 +28,13 @@ Output: `build/libs/inf_farlands-1.x.x.jar`
 
 - Ports Beta 1.7.3 noise; toggleable via config option.
 
+- Includes a custom light engine designed for Y coordinates up to ±2.14 billion.
+
 - **Far Lands** appear as a natural consequence of Beta 1.7.3 noise.
+
+## Note
+
+A full-Y-axis terrain generation pipeline is not implemented yet, but it is planned.
 
 ---
 
@@ -40,14 +46,22 @@ Config file: `config/inf_farlands-common.toml`.
 
 ## Warning
 
-This mod is experimental and relies on heavy Mixin usage, especially
-in the sky light engine which uses extensive reflection and @Overwrite.
-**Extremely incompatible** with other mods. Not recommended for
-survival gameplay.
+This mod is experimental.
+
+It relies on heavy Mixin usage to modify the game, including but not limited to extensive @Overwrite and reflection.
+
+Some versions contain many bugs that may cause game process CTD, OOM, or freezing.
+
+**Poorly compatible — not recommended for survival gameplay.**
 
 Known incompatibilities:
 
 - **C2ME**
+- **ScalableLux**
+
+Actively compatible mods:
+
+- **Sodium**
 
 ---
 
