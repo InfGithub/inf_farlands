@@ -16,10 +16,10 @@ public class LevelMixin {
 
     // @Overwrite
     // private static boolean isInWorldBoundsHorizontal(BlockPos pos) {
-    //     return (pos.getX() > ~Config.borderAbsoluteMax &&
-    //             pos.getZ() > ~Config.borderAbsoluteMax &&
-    //             pos.getX() < Config.borderAbsoluteMax &&
-    //             pos.getZ() < Config.borderAbsoluteMax);
+    // return (pos.getX() > ~Config.borderAbsoluteMax &&
+    // pos.getZ() > ~Config.borderAbsoluteMax &&
+    // pos.getX() < Config.borderAbsoluteMax &&
+    // pos.getZ() < Config.borderAbsoluteMax);
     // }
 
     @Inject(method = "isInSpawnableBounds", at = @At("HEAD"), cancellable = true)

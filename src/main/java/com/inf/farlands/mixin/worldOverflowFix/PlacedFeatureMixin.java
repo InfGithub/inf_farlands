@@ -3,7 +3,7 @@ package com.inf.farlands.mixin.worldOverflowFix;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.Inject;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
-import com.inf.farlands.Constants;
+import com.inf.farlands.WorldBounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
@@ -21,8 +21,7 @@ public class PlacedFeatureMixin {
             BlockPos pos,
             CallbackInfoReturnable<Boolean> cir) {
         int x = pos.getX(), z = pos.getZ();
-        int max = Constants.MAX_BLOCK;
-        if (x > max || x < ~max || z > max || z < ~max) {
+        if (!WorldBounds.inBlockXZ(x, z)) {
             cir.setReturnValue(false);
         }
     }

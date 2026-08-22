@@ -9,7 +9,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.Unique;
 
+import com.inf.farlands.EntitySectionWindow;
 import com.inf.farlands.IntSectionPos;
+import com.inf.farlands.ServerEntitySectionStorage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -28,16 +30,47 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.entity.EntityAccess;
 import net.minecraft.world.level.entity.EntitySection;
 import net.minecraft.world.level.entity.EntitySectionStorage;
+import net.minecraft.world.level.entity.Visibility;
 import net.minecraft.world.phys.AABB;
 
 @Mixin(EntitySectionStorage.class)
-public abstract class EntitySectionStorageMixin<T extends EntityAccess> {
-    // private EntitySection<T> createSection(long sectionPos) {
-    // long i = getChunkKeyFromSectionKey(sectionPos);
-    // Visibility visibility = this.intialSectionVisibility.get(i);
-    // this.sectionIds.add(sectionPos);
-    // return new EntitySection<>(this.entityClass, visibility);
-    // }
+public abstract class EntitySectionStorageMixin<T extends EntityAccess> implements ServerEntitySectionStorage {
+
+    /** 服务端标记（PersistentEntitySectionManager 构造时置 true；客户端 Transient 不标记）。 */
+    @Unique
+    private boolean serverSide;
+
+    @Override
+    public void markServerSide() {
+        this.serverSide = true;
+    }
+
+    @Shadow
+    private it.unimi.dsi.fastutil.longs.Long2ObjectFunction<Visibility> intialSectionVisibility;
+
+    @Shadow
+    private Class<? extends T> entityClass;
+
+    /**
+     * 方案 D：新 section 初始 visibility 窗口感知。vanilla 继承 chunk 当前
+     * visibility（TICKING chunk 的新 section = TICKING，不经过 updateChunkStatus
+     * 过滤）——实体跨 section 移动/新实体加入时窗口外 section 会被错误地 ticking。
+     * 创建时降级：TICKING + 窗口外 → TRACKED。
+     * （现有 onCreateSection @Inject TAIL 的 3int 索引保留，注入到覆盖后方法体）
+     */
+    @Overwrite
+    @SuppressWarnings({ "unchecked", "null" })
+    private EntitySection<T> createSection(long sectionPos) {
+        long i = getChunkKeyFromSectionKey(sectionPos);
+        Visibility visibility = this.intialSectionVisibility.get(i);
+        if (this.serverSide && visibility == Visibility.TICKING
+                && !EntitySectionWindow.inAnyWindow(IntSectionPos.getSectionPos(sectionPos).y)) {
+            visibility = Visibility.TRACKED;
+        }
+        this.sectionIds.add(sectionPos);
+        return new EntitySection<>((Class<T>) this.entityClass, visibility);
+    }
+
     @Unique
     private final Long2IntMap sectionXByKey = new Long2IntOpenHashMap();
     @Unique

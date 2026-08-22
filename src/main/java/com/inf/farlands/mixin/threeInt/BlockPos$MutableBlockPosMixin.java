@@ -6,7 +6,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
 @Mixin(BlockPos.MutableBlockPos.class)
-public abstract class MutableBlockPosMixin {
+public abstract class BlockPos$MutableBlockPosMixin {
 
     // 方法：
     // public BlockPos.MutableBlockPos set(long packedPos) {

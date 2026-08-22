@@ -1,8 +1,12 @@
 # Gradle
 .gradle/
+.gradle-home/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
+
+# Deploy keys
+.ssh_deploy/
 
 # IDE
 .eclipse/
@@ -28,6 +32,9 @@ logs/
 # Dev
 src/generated/
 doc/
+
+# Analysis output (jstack/spark dumps)
+*.txt
 repos/
 libs/
 CubicChunks2/

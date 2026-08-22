@@ -51,29 +51,16 @@ public abstract class BlockPosMixin {
         return (int) (packedPos << 64 - Z_OFFSET - PACKED_Z_LENGTH >> 64 - PACKED_Z_LENGTH);
     }
 
-    // --------------------------------
-
-    // 方法：
-    // public static long offset(long pos, int dx, int dy, int dz) {
-    // return asLong(getX(pos) + dx, getY(pos) + dy, getZ(pos) + dz);
-    // }
-
     @Overwrite
     public static long offset(long packedPos, int dx, int dy, int dz) {
         IntBlockPos pos = IntBlockPos.getBlockPos(packedPos);
         int nx = pos.x + dx;
         int ny = pos.y + dy;
         int nz = pos.z + dz;
-        // 存 CHM
         long key = HashUtil.hashPos((long) nx, (long) ny, (long) nz);
         HashUtil.putBlock(key, new IntBlockPos(nx, ny, nz));
         return key;
     }
-
-    // 方法：
-    // public static BlockPos of(long packedPos) {
-    // return new BlockPos(getX(packedPos), getY(packedPos), getZ(packedPos));
-    // }
 
     @Overwrite
     public static BlockPos of(long packedPos) {
@@ -81,23 +68,11 @@ public abstract class BlockPosMixin {
         return new BlockPos(pos.x, pos.y, pos.z);
     }
 
-    // 方法：
-    // public static long getFlatIndex(long packedPos) {
-    // return packedPos & -16L;
-    // }
-
     @Overwrite
     public static long getFlatIndex(long packedPos) {
         IntBlockPos pos = IntBlockPos.getBlockPos(packedPos);
         return HashUtil.hashPos((long) pos.x, 0, (long) pos.z);
     }
-
-    // --------------------------------
-
-    // 方法：
-    // public long asLong() {
-    // return asLong(this.getX(), this.getY(), this.getZ());
-    // }
 
     @Overwrite
     public long asLong() {
@@ -110,13 +85,6 @@ public abstract class BlockPosMixin {
         return key;
     }
 
-    // 方法：
-    // public static long asLong(int x, int y, int z) {
-    // long i = 0L;
-    // i |= ((long) x & PACKED_X_MASK) << X_OFFSET;
-    // i |= ((long) y & PACKED_Y_MASK) << 0;
-    // return i | ((long) z & PACKED_Z_MASK) << Z_OFFSET;
-    // }
     @Overwrite
     public static long asLong(int x, int y, int z) {
         long key = HashUtil.hashPos((long) x, (long) y, (long) z);

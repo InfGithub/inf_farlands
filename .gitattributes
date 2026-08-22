@@ -1,0 +1,12 @@
+# 行尾符规范化：文本文件统一以 LF 入库（工作区按平台自动转换）
+* text=auto
+
+# 二进制文件：禁止任何行尾符转换
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+*.class binary
+*.bbmodel binary

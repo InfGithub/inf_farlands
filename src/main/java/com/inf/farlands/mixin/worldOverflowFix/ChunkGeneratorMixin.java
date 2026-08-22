@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.Constants;
+import com.inf.farlands.WorldBounds;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -26,7 +26,7 @@ public class ChunkGeneratorMixin {
     ) {
         int cx = chunk.getPos().x;
         int cz = chunk.getPos().z;
-        if (cx >= Constants.MAX_CHUNK || cx < ~Constants.MAX_CHUNK || cz >= Constants.MAX_CHUNK || cz < ~Constants.MAX_CHUNK) {
+        if (!WorldBounds.inChunkRange(cx, cz)) {
             ci.cancel();
         }
     }

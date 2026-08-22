@@ -7,5 +7,7 @@
   "advancements.inf_farlands.end_far.title": "寂静的终点",
   "advancements.inf_farlands.end_far.description": "虚空回以凝视",
   "advancements.inf_farlands.corner_far.title": "边境之角",
-  "advancements.inf_farlands.corner_far.description": "原来世界是九十度的？"
+  "advancements.inf_farlands.corner_far.description": "原来世界是九十度的？",
+  "commands.inf_farlands.section.light.dump": "Section 光照数据已写入服务端日志。",
+  "commands.inf_farlands.client.section.light.dump": "Section 光照数据已写入客户端日志。"
 }

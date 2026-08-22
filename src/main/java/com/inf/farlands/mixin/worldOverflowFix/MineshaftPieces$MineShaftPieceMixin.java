@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.Constants;
+import com.inf.farlands.WorldBounds;
 import java.lang.reflect.Field;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.BlockPos.MutableBlockPos;
@@ -48,10 +48,10 @@ public class MineshaftPieces$MineShaftPieceMixin {
     protected boolean isInInvalidLocation(LevelAccessor level, BoundingBox bb) {
         BoundingBox self = getBoundingBoxField(this);
 
-        if (Math.abs((long) self.minX()) > Constants.MAX_BLOCK ||
-                Math.abs((long) self.maxX()) > Constants.MAX_BLOCK ||
-                Math.abs((long) self.minZ()) > Constants.MAX_BLOCK ||
-                Math.abs((long) self.maxZ()) > Constants.MAX_BLOCK) {
+        if (!WorldBounds.inBlock((long) self.minX()) ||
+                !WorldBounds.inBlock((long) self.maxX()) ||
+                !WorldBounds.inBlock((long) self.minZ()) ||
+                !WorldBounds.inBlock((long) self.maxZ())) {
             return true;
         }
 
@@ -64,10 +64,8 @@ public class MineshaftPieces$MineShaftPieceMixin {
 
         long midX = (long) b1 + (long) b4;
         long midZ = (long) b3 + (long) b6;
-        if (midX > Constants.MAX_BLOCK ||
-                midX < ~Constants.MAX_BLOCK ||
-                midZ > Constants.MAX_BLOCK ||
-                midZ < ~Constants.MAX_BLOCK ||
+        if (!WorldBounds.inBlock(midX) ||
+                !WorldBounds.inBlock(midZ) ||
                 b1 > b4 ||
                 b3 > b6) {
             return true;

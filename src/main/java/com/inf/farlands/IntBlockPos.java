@@ -26,7 +26,9 @@ public class IntBlockPos {
 
     public static IntBlockPos getBlockPos(long key) {
         IntBlockPos bp = HashUtil.getBlock(key);
-        return bp != null ? bp
-                : new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
+        if (bp != null) {
+            return bp;
+        }
+        return new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
     }
 }

@@ -7,8 +7,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
-// 覆盖方法，得到完整数据包
-
 @Mixin(FriendlyByteBuf.class)
 public class FriendlyByteBufMixin {
 

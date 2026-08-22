@@ -12,12 +12,13 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import net.minecraft.core.Holder;
 
 @Mixin(NoiseBasedChunkGenerator.class)
 public class NoiseBasedChunkGeneratorMixin {
 
     @Shadow
-    private net.minecraft.core.Holder<NoiseGeneratorSettings> settings;
+    private Holder<NoiseGeneratorSettings> settings;
 
     @Inject(method = "doFill", at = @At("HEAD"))
     private void captureChunk(Blender blender, StructureManager sm, RandomState rs, ChunkAccess chunk, int minCellY,

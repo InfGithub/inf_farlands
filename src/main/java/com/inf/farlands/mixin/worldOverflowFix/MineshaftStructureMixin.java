@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.Constants;
+import com.inf.farlands.WorldBounds;
 import java.util.Optional;
 import net.minecraft.world.level.levelgen.structure.Structure.GenerationStub;
 import net.minecraft.world.level.levelgen.structure.Structure.GenerationContext;
@@ -19,10 +19,7 @@ public class MineshaftStructureMixin {
             CallbackInfoReturnable<Optional<GenerationStub>> cir) {
         int cx = context.chunkPos().x;
         int cz = context.chunkPos().z;
-        if (cx > Constants.MAX_CHUNK ||
-                cx < ~Constants.MAX_CHUNK ||
-                cz > Constants.MAX_CHUNK ||
-                cz < ~Constants.MAX_CHUNK) {
+        if (!WorldBounds.inChunkRange(cx, cz)) {
             cir.setReturnValue(Optional.empty());
         }
     }

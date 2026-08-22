@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.Constants;
+import com.inf.farlands.WorldBounds;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -42,10 +42,7 @@ public class NoiseBasedChunkGeneratorMixin {
         ChunkPos chunkpos = level.getCenter();
         int cx = chunkpos.x;
         int cz = chunkpos.z;
-        if (cx >= Constants.MAX_CHUNK ||
-                cx < ~Constants.MAX_CHUNK ||
-                cz >= Constants.MAX_CHUNK ||
-                cz < ~Constants.MAX_CHUNK) {
+        if (!WorldBounds.inChunkRange(cx, cz)) {
             return;
         }
 
@@ -83,8 +80,7 @@ public class NoiseBasedChunkGeneratorMixin {
             CallbackInfo ci) {
         int cx = chunk.getPos().x;
         int cz = chunk.getPos().z;
-        if (cx >= Constants.MAX_CHUNK || cx < ~Constants.MAX_CHUNK ||
-                cz >= Constants.MAX_CHUNK || cz < ~Constants.MAX_CHUNK) {
+        if (!WorldBounds.inChunkRange(cx, cz)) {
             ci.cancel();
         }
     }

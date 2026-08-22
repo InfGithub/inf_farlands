@@ -16,16 +16,19 @@ public class ClientLightTrimmer {
     @SuppressWarnings("null")
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
-        if (++tickCounter % INTERVAL != 0) return;
+        if (++tickCounter % INTERVAL != 0) {
+            return;
+        }
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
+        if (mc.level == null || mc.player == null) {
+            return;
+        }
 
         int px = mc.player.blockPosition().getX() >> 4;
         int pz = mc.player.blockPosition().getZ() >> 4;
         int range = mc.options.renderDistance().get() + 2;
 
-        HashUtil.sectionLookup.values().removeIf(sp ->
-                Math.abs(sp.x - px) > range || Math.abs(sp.z - pz) > range);
+        HashUtil.sectionLookup.values().removeIf(sp -> Math.abs(sp.x - px) > range || Math.abs(sp.z - pz) > range);
     }
 }

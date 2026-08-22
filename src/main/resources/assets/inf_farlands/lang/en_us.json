@@ -7,5 +7,7 @@
   "advancements.inf_farlands.end_far.title": "Where Silence Ends",
   "advancements.inf_farlands.end_far.description": "The void stares back",
   "advancements.inf_farlands.corner_far.title": "The Corner of the World",
-  "advancements.inf_farlands.corner_far.description": "So the world has ninety degrees?"
+  "advancements.inf_farlands.corner_far.description": "So the world has ninety degrees?",
+  "commands.inf_farlands.section.light.dump": "Section light dump written to server log.",
+  "commands.inf_farlands.client.section.light.dump": "Section light dump written to client log."
 }

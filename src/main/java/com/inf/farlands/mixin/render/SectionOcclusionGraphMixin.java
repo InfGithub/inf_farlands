@@ -5,12 +5,14 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import java.util.concurrent.Future;
+import net.minecraft.client.renderer.SectionOcclusionGraph;
 
-@Mixin(net.minecraft.client.renderer.SectionOcclusionGraph.class)
+@Mixin(SectionOcclusionGraph.class)
 public class SectionOcclusionGraphMixin {
 
     @Shadow
-    private java.util.concurrent.Future<?> fullUpdateTask;
+    private Future<?> fullUpdateTask;
 
     @Inject(method = "update", at = @At("TAIL"))
     private void waitForFullUpdate(CallbackInfo ci) {
