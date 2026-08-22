@@ -45,3 +45,4 @@ the_log.txt
 stderr.txt
 
 src/.main/
+prod_logs/

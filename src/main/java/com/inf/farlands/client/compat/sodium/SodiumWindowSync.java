@@ -252,10 +252,9 @@ public final class SodiumWindowSync {
             mInstanceNullable = swrClass.getMethod("instanceNullable");
             fRenderSectionManager = swrClass.getDeclaredField("renderSectionManager");
             fRenderSectionManager.setAccessible(true);
-            mOnChunkAdded = Class.forName("net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager")
-                    .getMethod("onChunkAdded", int.class, int.class);
-            mOnSectionRemoved = Class.forName("net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager")
-                    .getMethod("onSectionRemoved", int.class, int.class, int.class);
+            Class<?> rsmClass = Class.forName("net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager");
+            mOnChunkAdded = rsmClass.getMethod("onChunkAdded", int.class, int.class);
+            mOnSectionRemoved = rsmClass.getMethod("onSectionRemoved", int.class, int.class, int.class);
         }
         Object swr = mInstanceNullable.invoke(null);
         return swr == null ? null : fRenderSectionManager.get(swr);

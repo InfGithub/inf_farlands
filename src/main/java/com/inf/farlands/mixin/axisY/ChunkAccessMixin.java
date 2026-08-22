@@ -262,6 +262,12 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
             if (index >= 0 && index < arr.length) {
                 arr[index] = s;
             }
+            // 同步 windowSections（窗口数组）：数据到达时只写 allSections + vanilla sections
+            // 数组（F_SECTIONS），windowSections 仅在 buildWindow 重建——若 buildWindow 先于
+            // 数据跑，窗口数组留懒创建空 → sodium 编译读到空 → section 消失。这里补同步。
+            if (index >= 0 && index < this.windowSections.length) {
+                this.windowSections[index] = s;
+            }
         } catch (Exception ignored) {
         }
         return s;
