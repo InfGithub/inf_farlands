@@ -43,10 +43,9 @@ public abstract class ClientPacketListenerMixin {
     private net.minecraft.client.multiplayer.ClientLevel level;
 
     /**
-     * Fix: mark sections that actually have data (allSections) instead of
-     * window array. The window is a view maintained by repositionCamera
-     * (render frame); a fresh chunk keeps its constructor window (1 section)
-     * until then, so window-based iteration misses most sections.
+     * 修复：标记实际有数据的 section（allSections），而非窗口数组。窗口是
+     * repositionCamera 维护的视图（渲染帧）；新 chunk 在此之前保持构造窗口
+     * （1 个 section），按窗口迭代会漏掉大部分 section。
      */
     @SuppressWarnings("null")
     @Overwrite
@@ -83,9 +82,8 @@ public abstract class ClientPacketListenerMixin {
     }
 
     /**
-     * Fix: capture chunk section Ys before drop, then clean light
-     * data for actual sections instead of level min/max range.
-     * At ±2.14B chunk sections are at Y ~134M, not -4..19.
+     * 修复：卸载前捕获 chunk 的 section Y，然后清理实际 section 的光照数据，
+     * 而非 level 的最小/最大范围。±2.14B 下 chunk section 在 Y ~134M，不是 -4..19。
      */
     @SuppressWarnings("null")
     @Overwrite
@@ -132,10 +130,9 @@ public abstract class ClientPacketListenerMixin {
     }
 
     /**
-     * Fix: mark sections that actually have data (allSections) instead of
-     * the window array. The window is a view maintained by repositionCamera
-     * (render frame); a fresh chunk keeps its constructor window (1 section)
-     * until then, so window-based iteration misses most sections.
+     * 修复：标记实际有数据的 section（allSections），而非窗口数组。窗口是
+     * repositionCamera 维护的视图（渲染帧）；新 chunk 在此之前保持构造窗口
+     * （1 个 section），按窗口迭代会漏掉大部分 section。
      */
     @SuppressWarnings("null")
     @Overwrite

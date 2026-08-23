@@ -25,6 +25,7 @@ import org.spongepowered.asm.mixin.Shadow;
 public abstract class SectionStorageGetOrLoadMixin {
 
     @Shadow
+    @SuppressWarnings("rawtypes")
     protected abstract Optional get(long sectionKey);
 
     @Shadow
@@ -34,7 +35,7 @@ public abstract class SectionStorageGetOrLoadMixin {
     private void readColumn(ChunkPos chunkPos) {
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({ "rawtypes"})
     @Overwrite
     protected Optional getOrLoad(long sectionKey) {
         if (this.outsideStoredRange(sectionKey)) {

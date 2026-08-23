@@ -30,14 +30,14 @@ import com.mojang.blaze3d.platform.GlStateManager.SourceFactor;
 import com.mojang.blaze3d.platform.GlStateManager.DestFactor;
 
 /**
- * 六面体边界渲染（outsideWorld）：renderWorldBorder 六面体版（#27 修复并入）。
+ * 六面体边界渲染：renderWorldBorder 六面体版。
  *
  * vanilla 四面板的 Y 顶点 = 相机 ± depthFar（跟随相机的 1280 格高墙）——XZ 墙在 Y 上
  * 无世界边界；地板/天花板不渲染。六面体版：
  * 1. XZ 四面板 Y 顶点 = [minY, maxY]（±(borderAbsoluteMax-16)，与 XZ 墙对齐，固定世界 Y 边界）
  * 2. 新增地板（y=minY）/天花板（y=maxY）面板（XZ 段 = 视距内）
  * 3. 触发条件/透明度三维化（到六面体最近面距离 < d0）
- * 4. floorSafe/ceilSafe 并入（#27：Mth.floor/ceil int 溢出在 ±2.14B 边界）
+ * 4. floorSafe/ceilSafe 并入（Mth.floor/ceil int 溢出在 ±2.14B 边界）
  * 5. outside=true → 不渲染
  *
  * float 精度安全：面板顶点 = 边界 - 相机（玩家靠近面板时差值小）；玩家距某面 > d0

@@ -17,19 +17,16 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Fix sound coordinates overflowing the vanilla int*8 encoding.
+ * 修复声音坐标溢出 vanilla int*8 编码的问题。
  * <p>
- * Vanilla stores sound positions as {@code (int)(coord * 8.0)} — at
- * |Y| &gt; 268M this saturates at Integer.MAX_VALUE, so the client decodes a
- * garbage position (~268M blocks away) and OpenAL attenuation silences the
- * sound (chests, barrels, any server-side {@code playSound(double...)}).
+ * vanilla 以 {@code (int)(coord * 8.0)} 存储声音位置——在 |Y| > 268M 时饱和于
+ * Integer.MAX_VALUE，客户端解码出垃圾位置（约 2.68 亿格远），OpenAL 衰减使
+ * 声音静音（箱子、木桶、任何服务端 {@code playSound(double...)}）。
  * <p>
- * This mixin keeps the exact same wire layout (sound, source, x, y, z,
- * volume, pitch, seed) but transports coordinates as 8-byte longs
- * ({@code (long)(coord * 8.0)}). Decoding uses {@code readLong} via
- * {@link Redirect} of the three {@code readInt} calls; the original int
- * fields keep their saturated values but are never read (getters are
- * overwritten to decode from the long fields). The packet grows 12 bytes.
+ * 本 mixin 保持完全相同的线上布局（sound、source、x、y、z、volume、pitch、
+ * seed），但坐标以 8 字节 long 传输（{@code (long)(coord * 8.0)}）。解码通过
+ * {@link Redirect} 三个 {@code readInt} 调用改用 {@code readLong}；原 int
+ * 字段保留饱和值但不再读取（getter 被覆写为从 long 字段解码）。包增大 12 字节。
  */
 @Mixin(ClientboundSoundPacket.class)
 public abstract class ClientboundSoundPacketMixin {

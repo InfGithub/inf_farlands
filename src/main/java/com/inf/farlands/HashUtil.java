@@ -172,7 +172,7 @@ public class HashUtil {
         }
     }
 
-    // ============ Light Engine helpers (Light Engine windowing) ============
+    // ============ Light Engine helpers（Light Engine windowing）============
     private static final Field F_STORAGE;
     private static final Method M_ENQUEUE_INC;
     private static final Method M_ENQUEUE_DEC;
@@ -185,27 +185,27 @@ public class HashUtil {
 
     static {
         try {
-            // storage field on all LightEngines
+            // 所有 LightEngine 的 storage 字段
             F_STORAGE = LightEngine.class.getDeclaredField("storage");
             F_STORAGE.setAccessible(true);
 
-            // enqueue methods on LightEngine
+            // LightEngine 的入队方法
             M_ENQUEUE_INC = LightEngine.class.getDeclaredMethod("enqueueIncrease", Long.TYPE, Long.TYPE);
             M_ENQUEUE_INC.setAccessible(true);
             M_ENQUEUE_DEC = LightEngine.class.getDeclaredMethod("enqueueDecrease", Long.TYPE, Long.TYPE);
             M_ENQUEUE_DEC.setAccessible(true);
 
-            // setStoredLevel — defined on LayerLightSectionStorage (shared by sky/block)
+            // setStoredLevel —— 定义在 LayerLightSectionStorage（sky/block 共用）
             M_SET_STORED_LEVEL = LayerLightSectionStorage.class
                     .getDeclaredMethod("setStoredLevel", Long.TYPE, Integer.TYPE);
             M_SET_STORED_LEVEL.setAccessible(true);
 
-            // ADD_SKY_SOURCE_ENTRY — static long on SkyLightEngine
+            // ADD_SKY_SOURCE_ENTRY —— SkyLightEngine 上的静态 long
             Field f = SkyLightEngine.class.getDeclaredField("ADD_SKY_SOURCE_ENTRY");
             f.setAccessible(true);
             ADD_SKY_SOURCE_ENTRY = f.getLong(null);
 
-            // ThreadedLevelLightEngine task scheduling
+            // ThreadedLevelLightEngine 任务调度
             Class<?> taskTypeClass = Class
                     .forName("net.minecraft.server.level.ThreadedLevelLightEngine$TaskType");
 

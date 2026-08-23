@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.light;
+package com.inf.farlands.mixin.axisY;
 
 import com.inf.farlands.light.FarLandsLightEngine;
 import net.minecraft.client.Minecraft;
@@ -13,9 +13,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 将 ClientChunkCache 构造中的 {@code new LevelLightEngine}
- * 替换为 {@link FarLandsLightEngine}。ClientChunkCache 仅客户端使用，
- * 本 mixin 在专用服务器上静默跳过。
+ * Replace {@code new LevelLightEngine} in ClientChunkCache constructor
+ * with {@link FarLandsLightEngine}. ClientChunkCache is client-only
+ * so this mixin is silently skipped on dedicated servers.
  *
  * <p>{@code onLightUpdate}（LightChunkGetter default）：客户端本地传播
  * （LevelRenderer 每帧 runLightUpdates）后的 affected-section 通知 →

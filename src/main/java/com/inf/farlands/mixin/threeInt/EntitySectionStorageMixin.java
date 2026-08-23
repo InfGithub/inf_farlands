@@ -52,7 +52,7 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
     private Class<? extends T> entityClass;
 
     /**
-     * 方案 D：新 section 初始 visibility 窗口感知。vanilla 继承 chunk 当前
+     * 新 section 初始 visibility 窗口感知。vanilla 继承 chunk 当前
      * visibility（TICKING chunk 的新 section = TICKING，不经过 updateChunkStatus
      * 过滤）——实体跨 section 移动/新实体加入时窗口外 section 会被错误地 ticking。
      * 创建时降级：TICKING + 窗口外 → TRACKED。

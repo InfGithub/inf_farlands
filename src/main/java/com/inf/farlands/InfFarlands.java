@@ -140,7 +140,7 @@ public class InfFarlands {
             lastPlayerRoster = roster;
             windowChanged = true;
         }
-        // 方案 D：实体 section 窗口并集更新（先于补触发，刷新用新窗口）
+        // 实体 section 窗口并集更新（先于补触发，刷新用新窗口）
         EntitySectionWindow.update(players);
         if (windowChanged) {
             refreshEntitySectionStatus(server);
@@ -163,8 +163,8 @@ public class InfFarlands {
         if (state == null || state.dimension != dim) {
             windowStates.put(id, new PlayerWindowState(centerY, dim));
             // 首次注册（含重连）——全部窗口 section 入队
-            int min = centerY - WindowedChunk.WINDOW_HALF_BELOW;
-            int max = centerY + WindowedChunk.WINDOW_HALF_ABOVE;
+            int min = centerY - Config.verticalSimulationDistance;
+            int max = centerY + Config.verticalSimulationDistance;
             for (int sy = min; sy <= max; sy++) {
                 int s = sy;
                 player.getChunkTrackingView().forEach(cp -> pendingQueues
@@ -177,10 +177,10 @@ public class InfFarlands {
         if (state.centerY == centerY) {
             return false;
         }
-        int oldMin = state.centerY - WindowedChunk.WINDOW_HALF_BELOW;
-        int oldMax = state.centerY + WindowedChunk.WINDOW_HALF_ABOVE;
-        int newMin = centerY - WindowedChunk.WINDOW_HALF_BELOW;
-        int newMax = centerY + WindowedChunk.WINDOW_HALF_ABOVE;
+        int oldMin = state.centerY - Config.verticalSimulationDistance;
+        int oldMax = state.centerY + Config.verticalSimulationDistance;
+        int newMin = centerY - Config.verticalSimulationDistance;
+        int newMax = centerY + Config.verticalSimulationDistance;
         for (int sy = newMin; sy <= newMax; sy++) {
             if (sy >= oldMin && sy <= oldMax) {
                 continue;
@@ -215,7 +215,7 @@ public class InfFarlands {
     }
 
     /**
-     * 方案 D 补触发：窗口滑动/玩家 roster 变化 → 对所有 TICKING chunk 重新调
+     * 补触发：窗口滑动/玩家 roster 变化 → 对所有 TICKING chunk 重新调
      * updateChunkStatus（PersistentEntitySectionManagerMixin 内按新窗口过滤）——
      * 滑出 section 的实体 stopTicking、滑入的 startTicking。
      */
@@ -247,7 +247,7 @@ public class InfFarlands {
         ServerLevel level = (ServerLevel) player.level();
         ChunkPos playerChunk = player.chunkPosition();
         int budget = Config.sectionSendBytesPerTick;
-        int windowMinY = Mth.floorDiv(player.getBlockY(), 16) - WindowedChunk.WINDOW_HALF_BELOW;
+        int windowMinY = Mth.floorDiv(player.getBlockY(), 16) - Config.verticalSimulationDistance;
 
         List<Map.Entry<Long, IntSet>> sorted = new ArrayList<>(queue.entrySet());
         sorted.sort(Comparator.comparingLong(e -> distSq(e.getKey(), playerChunk)));
@@ -344,7 +344,7 @@ public class InfFarlands {
                         if (!(chunk instanceof LevelChunk lc)) {
                             continue;
                         }
-                        ((WindowedChunk) lc).setLastPacketWindow(minY, minY + 33);
+                        ((WindowedChunk) lc).setLastPacketWindow(minY, minY + ((WindowedChunk) lc).windowHalfBelow() + ((WindowedChunk) lc).windowHalfAbove());
                         // 不可变切换：新建 section 整体替换（PalettedContainer.read 的 createOrReuseData
                         // 会复用现有 Data 原地改 palette——与渲染编译线程并发读时读到 palette 中间状态
                         // → MissingPaletteEntryException CTD（重生窗口跳变场景）。新建对象无并发读者。

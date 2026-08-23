@@ -1,0 +1,66 @@
+package com.inf.farlands.light;
+
+import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import net.minecraft.world.level.ChunkPos;
+
+/**
+ * per-chunk 光照任务锁（半径 2）。
+ *
+ * 一个 chunk 的传播会写邻居 section（方块光最远 15 格 = XZ ±1 section），且
+ * 天空光初始化/空 section 检查涉 3×3 邻居——锁半径 2 保证相邻 chunk 的光照任务
+ * 不并发（同一 section 不被两个任务同时写，DataLayer.set 半字节读改写不竞争）。
+ *
+ * 获取按 chunk key 排序（防死锁）；任一失败回滚已获取的锁并返回 false（调用方
+ * 将任务放回队列重试）。
+ */
+public final class LightTaskLock {
+
+    public static final int RADIUS = 2;
+
+    private final ConcurrentHashMap<Long, AtomicBoolean> locks = new ConcurrentHashMap<>();
+
+    /** 尝试获取中心 chunk 半径 {@link #RADIUS} 内全部锁。 */
+    public boolean tryLock(int chunkX, int chunkZ) {
+        long[] keys = new long[(RADIUS * 2 + 1) * (RADIUS * 2 + 1)];
+        int n = 0;
+        for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+            for (int dx = -RADIUS; dx <= RADIUS; dx++) {
+                keys[n++] = ChunkPos.asLong(chunkX + dx, chunkZ + dz);
+            }
+        }
+        Arrays.sort(keys);
+        int acquired = 0;
+        for (int i = 0; i < n; i++) {
+            AtomicBoolean lock = locks.computeIfAbsent(keys[i], k -> new AtomicBoolean());
+            if (lock.compareAndSet(false, true)) {
+                acquired++;
+            } else {
+                // 回滚已获取的
+                for (int j = 0; j < acquired; j++) {
+                    AtomicBoolean held = locks.get(keys[j]);
+                    if (held != null) {
+                        held.set(false);
+                    }
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 释放中心 chunk 半径内全部锁。 */
+    public void unlock(int chunkX, int chunkZ) {
+        for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+            for (int dx = -RADIUS; dx <= RADIUS; dx++) {
+                long key = ChunkPos.asLong(chunkX + dx, chunkZ + dz);
+                AtomicBoolean lock = locks.get(key);
+                if (lock != null) {
+                    lock.set(false);
+                }
+            }
+        }
+    }
+}

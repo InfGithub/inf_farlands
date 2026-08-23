@@ -35,7 +35,7 @@ import net.minecraft.world.level.entity.EntityPersistentStorage;
 public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess> {
 
     /**
-     * 方案 A：服务端实体 section 存储标记——createSection 的窗口过滤仅服务端生效
+     * 服务端实体 section 存储标记——createSection 的窗口过滤仅服务端生效
      * （客户端 TransientEntitySectionManager 也用 EntitySectionStorage，未标记则
      * 不过滤——客户端实体必须持续 tick 插值，否则瞬移/鬼畜）。
      */
@@ -77,7 +77,7 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     }
 
     /**
-     * 方案 D：实体 section 状态窗口感知（与 vanilla 逐行一致 + 窗口过滤）。
+     * 实体 section 状态窗口感知（与 vanilla 逐行一致 + 窗口过滤）。
      * chunk 状态变化时遍历全部 sections——窗口外 section（不在任何玩家
      * [secY−17, secY+16]）的 TICKING 降为 TRACKED：实体不 tick、保留
      * accessible（碰撞/查询/交互）。窗口滑动由 InfFarlands 补触发本方法。

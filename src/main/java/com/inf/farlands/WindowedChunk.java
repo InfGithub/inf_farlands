@@ -14,18 +14,22 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
  */
 public interface WindowedChunk {
 
-    /** 中心下方半径（下界 = center - 17） */
-    int WINDOW_HALF_BELOW = 17;
+    /** 中心下方半径（下界 = center - N），N = Config.verticalSimulationDistance。 */
+    default int windowHalfBelow() {
+        return Config.verticalSimulationDistance;
+    }
 
-    /** 中心上方半径（上界 = center + 16） */
-    int WINDOW_HALF_ABOVE = 16;
+    /** 中心上方半径（上界 = center + N）。对称。 */
+    default int windowHalfAbove() {
+        return Config.verticalSimulationDistance;
+    }
 
     /** 重建窗口视图为精确的 [sectionYMin, sectionYMax]。 */
     void buildWindow(int sectionYMin, int sectionYMax);
 
-    /** 窗口滑到以 centerSectionY 为中心（34 section）。 */
+    /** 窗口滑到以 centerSectionY 为中心（对称 ±N）。 */
     default void moveWindowTo(int centerSectionY) {
-        buildWindow(centerSectionY - WINDOW_HALF_BELOW, centerSectionY + WINDOW_HALF_ABOVE);
+        buildWindow(centerSectionY - windowHalfBelow(), centerSectionY + windowHalfAbove());
     }
 
     /** 确保 sectionY 可见：窗口内不动，窗口外将窗口滑到该点。 */

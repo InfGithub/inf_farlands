@@ -15,15 +15,14 @@ import java.lang.reflect.Field;
 import java.util.List;
 
 /**
- * Fix BE position reconstruction on the client.
+ * 修复客户端方块实体位置重建。
  * <p>
- * {@code getBlockEntitiesTags} rebuilds each BE position from
- * {@code BlockEntityInfo.packedXZ} + {@code y}. The vanilla {@code y} field is
- * the short-truncated value; the full Y is stored in the mixin-injected
- * {@code yCorrect} field (see
- * {@code ClientboundLevelChunkPacketData$BlockEntityInfoMixin}).
- * {@code BlockEntityInfo} is package-private, so its fields are read via
- * reflection (same pattern as {@code F_WINDOW_MIN_Y}).
+ * {@code getBlockEntitiesTags} 从 {@code BlockEntityInfo.packedXZ} + {@code y}
+ * 重建每个方块实体位置。vanilla 的 {@code y} 字段是 short 截断值；完整 Y 存于
+ * mixin 注入的 {@code yCorrect} 字段（见
+ * {@code ClientboundLevelChunkPacketData$BlockEntityInfoMixin}）。
+ * {@code BlockEntityInfo} 是包私有，其字段经反射读取（与 {@code F_WINDOW_MIN_Y}
+ * 同模式）。
  */
 @Mixin(ClientboundLevelChunkPacketData.class)
 public abstract class ClientboundLevelChunkPacketDataMixin {

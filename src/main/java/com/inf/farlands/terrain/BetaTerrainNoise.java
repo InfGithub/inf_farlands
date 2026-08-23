@@ -3,8 +3,7 @@ package com.inf.farlands.terrain;
 import net.minecraft.util.RandomSource;
 
 /**
- * Replicates beta 1.7.3's five-channel octave noise used in
- * {@code ChunkProviderGenerate.func_4061_a}.
+ * 复刻 beta 1.7.3 用于 {@code ChunkProviderGenerate.func_4061_a} 的五通道八度噪声。
  *
  * <pre>{@code
  *   0 — field_4184_e   lower terrain limit     (16 octaves, 3D)
@@ -26,11 +25,11 @@ public final class BetaTerrainNoise {
     public BetaTerrainNoise(long seed) {
         RandomSource random = RandomSource.create(seed);
         this.octaves = new LegacyPerlinNoise[][] {
-                createOctaves(random, O_LIMIT), // 0: lower limit
-                createOctaves(random, O_LIMIT), // 1: upper limit
-                createOctaves(random, O_BLEND), // 2: blend weight
-                createOctaves(random, O_TEMP), // 3: temperature proxy
-                createOctaves(random, O_LIMIT), // 4: humidity proxy
+                createOctaves(random, O_LIMIT), // 0：下界限制
+                createOctaves(random, O_LIMIT), // 1：上界限制
+                createOctaves(random, O_BLEND), // 2：混合权重
+                createOctaves(random, O_TEMP), // 3：温度代理
+                createOctaves(random, O_LIMIT), // 4：湿度代理
         };
     }
 

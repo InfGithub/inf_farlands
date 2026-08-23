@@ -31,7 +31,7 @@ public class PlayerChunkSenderMixin {
             CallbackInfo ci) {
         ServerPlayer player = packetListener.player;
         int centerY = Mth.floorDiv(player.getBlockY(), 16);
-        WindowSendState.setWindowMinY(centerY - WindowedChunk.WINDOW_HALF_BELOW);
+        WindowSendState.setWindowMinY(centerY - ((WindowedChunk) chunk).windowHalfBelow());
     }
 
     @Inject(method = "sendChunk", at = @At("RETURN"))

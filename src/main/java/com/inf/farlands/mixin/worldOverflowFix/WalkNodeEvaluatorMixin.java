@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 极端 Y 空中/水下 mob 的寻路扫描 -64 下限（note.md #16 残留）。
+ * 极端 Y 空中/水下 mob 的寻路扫描 -64 下限。
  *
  * getStart（L72）：空中 mob 向下扫到 getMinBuildHeight()（-64）找支撑方块——
  * 极端 Y 空中 mob（掉落/击飞/tp 未落地）扫 2.14B 次 getBlockState（每 16 格

@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.light;
+package com.inf.farlands.mixin.axisY;
 
 import com.inf.farlands.light.FarLandsLightEngine;
 import com.inf.farlands.light.FarLandsLightPacketData;
@@ -13,8 +13,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 把 {@link FarLandsLightPacketData} 附加到 chunk-with-light 包上，
- * 使所有 section（不只 26 个）在一次原子写入中携带光照数据。
+ * Appends {@link FarLandsLightPacketData} to the chunk-with-light packet
+ * so all sections (not just 26) carry light data in one atomic write.
  */
 @Mixin(ClientboundLevelChunkWithLightPacket.class)
 public class ClientboundLevelChunkWithLightPacketMixin {

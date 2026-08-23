@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 /**
- * 冻结修复（#22 追踪）：renderSnowAndRain 循环边界 long 化。
+ * 冻结修复：renderSnowAndRain 循环边界 long 化。
  *
  * vanilla L292-293：for (int j1 = k - l; j1 <= k + l; j1++)——k = floor(camZ)，
  * 玩家坐标 ±2.14B 下 k + l 恰好 = Integer.MAX_VALUE 时（k = 2147483637, l = 10），
@@ -40,8 +40,7 @@ import org.spongepowered.asm.mixin.Shadow;
  * 内 @Redirect useFancyGraphics（天气质量选项）——@Overwrite 的方法带 merged
  * 标记，若我们先应用则 sodium 注入器拒绝注入 → sodium 应用失败 → 启动 CTD。
  * priority 100 < 1000 让我们后应用：sodium 先注入成功（vanilla 方法体），
- * 我们再 @Overwrite 覆盖（sodium 天气选项失效，功能损失可接受；#24/#25
- * 修复完整保留）。
+ * 我们再 @Overwrite 覆盖（sodium 天气选项失效，功能损失可接受；修复完整保留）。
  */
 @Mixin(value = LevelRenderer.class, priority = 100)
 public class LevelRendererMixin {

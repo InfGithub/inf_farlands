@@ -34,7 +34,7 @@ import org.spongepowered.asm.mixin.Shadow;
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
 
-    // @Shadow 只解析目标类自身声明的成员（note.md 11：继承成员不解析）。
+    // @Shadow 只解析目标类自身声明的成员（继承成员不解析）。
     // Level 的成员（random/isRaining/getProfiler/getBlockRandomPos 等）全部
     // public，用 ((Level)(Object)this) cast 直接访问。
     @Shadow
@@ -112,8 +112,8 @@ public abstract class ServerLevelMixin {
                 }
 
                 int centerY = Mth.floorDiv(player.getBlockY(), 16);
-                for (int sy = centerY - WindowedChunk.WINDOW_HALF_BELOW; sy <= centerY
-                        + WindowedChunk.WINDOW_HALF_ABOVE; sy++) {
+                for (int sy = centerY - ((WindowedChunk) chunk).windowHalfBelow(); sy <= centerY
+                        + ((WindowedChunk) chunk).windowHalfAbove(); sy++) {
                     sectionYs.add(sy);
                 }
             }

@@ -42,7 +42,7 @@ public class DimensionTypeMixin {
 
     @Inject(method = "<clinit>", at = @At("RETURN"))
     private static void onClinit(CallbackInfo ci) {
-        // Set to values where * 2 = ±MAX_BLOCK without overflow
+        // 设为 ×2 = ±MAX_BLOCK 且不溢出的值
         MIN_Y = -Constants.MAX_BLOCK / 2;
         MAX_Y = Constants.MAX_BLOCK / 2;
         Y_SIZE = Integer.MAX_VALUE;

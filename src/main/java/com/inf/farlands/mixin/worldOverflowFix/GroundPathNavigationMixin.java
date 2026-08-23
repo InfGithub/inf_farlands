@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.Unique;
  * = dimensionType().minY()/height()，overworld -64/320）作为空气目标的
  * 向下/向上扫描边界——本 mod 允许方块存在于 ±2.14B 任意 Y，但该边界未
  * Config 化 → 极端 Y 空气目标向下扫 2.14B 格到 -64 找不到支撑方块 → 目标
- * 被改写为 -63（基岩上方）→ 寻路到地底/失败（note.md #7）。
+ * 被改写为 -63（基岩上方）→ 寻路到地底/失败。
  *
  * 修复：
  * 1. 扫描边界 → Config.worldGenMinY/MaxY 与目标 Y ±maxCapIter 的交集（long 防

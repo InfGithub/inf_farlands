@@ -34,6 +34,7 @@ public class RenderSectionSetOriginMixin {
     private void reset() {
     }
 
+    @SuppressWarnings("null")
     @Overwrite
     public void setOrigin(int x, int y, int z) {
         this.reset();

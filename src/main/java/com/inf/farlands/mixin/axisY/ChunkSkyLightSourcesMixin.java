@@ -1,15 +1,12 @@
-package com.inf.farlands.mixin.light;
+package com.inf.farlands.mixin.axisY;
 
 import com.inf.farlands.Config;
-import com.inf.farlands.WindowedChunk;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.BitStorage;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.lighting.ChunkSkyLightSources;
@@ -36,21 +33,13 @@ public class ChunkSkyLightSourcesMixin {
      * 使用（fixBits/@ModifyArg 改的是构造创建的 BitStorage 位数，无害）。
      */
     @Unique
-    private final ConcurrentHashMap<Integer, Integer> sourceMap = new ConcurrentHashMap<>();
+    private final Int2IntOpenHashMap sourceMap = new Int2IntOpenHashMap();
 
     @Shadow @Final @Mutable
     private BitStorage heightmap;
 
     @Shadow
     private int minY;
-
-    @Shadow
-    @Final
-    private BlockPos.MutableBlockPos mutablePos1;
-
-    @Shadow
-    @Final
-    private BlockPos.MutableBlockPos mutablePos2;
 
     private static LevelHeightAccessor capturedLevel;
 
@@ -78,8 +67,7 @@ public class ChunkSkyLightSourcesMixin {
 
     @Overwrite
     private int get(int index) {
-        Integer v = sourceMap.get(index);
-        return v != null ? v : this.minY;
+        return sourceMap.containsKey(index) ? sourceMap.get(index) : this.minY;
     }
 
     @Overwrite
@@ -100,76 +88,6 @@ public class ChunkSkyLightSourcesMixin {
         } else {
             sourceMap.replaceAll((k, v) -> value);
         }
-    }
-
-    /**
-     * 覆盖 fillFrom：直接用 allSections（数据仓库）计算真实最高非空 section 与遮挡，
-     * 不依赖 getHighestFilledSectionIndex/getSection（窗口数组语义）。
-     *
-     * 原实现依赖窗口：客户端 replaceWithPacketData 时窗口为构造默认（1 section -4）或
-     * 拉正窗口——getHighestFilledSectionIndex 用窗口索引 → fillFrom 从窗口 section 找遮挡
-     * → 最低光源被算到窗口内（如 -4 附近 / 玩家附近）而非真实地表 → 任何破坏格 y >=
-     * lowestY → 破坏格被当天空光源 ADD 15 → 自然衰减传播（任何 y 火把样）。
-     */
-    @Overwrite
-    public void fillFrom(net.minecraft.world.level.chunk.ChunkAccess chunk) {
-        if (!(chunk instanceof WindowedChunk wc)) {
-            this.fill(this.minY);
-            return;
-        }
-        Map<Integer, LevelChunkSection> all = wc.windowedAllSections();
-        int highest = Integer.MIN_VALUE;
-        int lowestSection = Integer.MAX_VALUE;
-        for (Integer sy : all.keySet()) {
-            LevelChunkSection s = all.get(sy);
-            if (s != null && !s.hasOnlyAir()) {
-                if (sy > highest) {
-                    highest = sy;
-                }
-                if (sy < lowestSection) {
-                    lowestSection = sy;
-                }
-            }
-        }
-        if (highest == Integer.MIN_VALUE) {
-            this.fill(this.minY);
-            return;
-        }
-        for (int gx = 0; gx < 16; gx++) {
-            for (int gz = 0; gz < 16; gz++) {
-                int lowest = this.findLowestSourceYAll(chunk, all, highest, lowestSection, gx, gz);
-                this.set(gx + gz * 16, Math.max(lowest, this.minY));
-            }
-        }
-    }
-
-    /** 复刻 vanilla findLowestSourceY，但用 allSections（绝对 section Y）逐格向下找遮挡。 */
-    @Unique
-    @SuppressWarnings("null")
-    private int findLowestSourceYAll(net.minecraft.world.level.chunk.ChunkAccess chunk,
-            Map<Integer, LevelChunkSection> all, int highestSection, int lowestSection, int x, int z) {
-        this.mutablePos1.set(x, highestSection * 16 + 16, z);
-        this.mutablePos2.set(x, highestSection * 16 + 15, z);
-        BlockState above = Blocks.AIR.defaultBlockState();
-        for (int sy = highestSection; sy >= lowestSection; sy--) {
-            LevelChunkSection sec = all.get(sy);
-            if (sec == null || sec.hasOnlyAir()) {
-                above = Blocks.AIR.defaultBlockState();
-                this.mutablePos1.setY(sy * 16 + 15);
-                this.mutablePos2.setY(sy * 16 + 14);
-                continue;
-            }
-            for (int k = 15; k >= 0; k--) {
-                BlockState state = sec.getBlockState(x, k, z);
-                if (isEdgeOccluded(chunk, this.mutablePos1, above, this.mutablePos2, state)) {
-                    return this.mutablePos1.getY();
-                }
-                above = state;
-                this.mutablePos1.set(this.mutablePos2);
-                this.mutablePos2.move(Direction.DOWN);
-            }
-        }
-        return this.minY;
     }
 
     @Shadow

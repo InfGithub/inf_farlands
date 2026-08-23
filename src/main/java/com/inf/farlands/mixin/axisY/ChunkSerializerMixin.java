@@ -119,7 +119,7 @@ public class ChunkSerializerMixin {
 
             Map<Integer, LevelChunkSection> all = ((WindowedChunk) chunk).windowedAllSections();
             ListTag list = tag.getList("sections", 10);
-            // Remove stale extreme-Y entries from previous saves to prevent duplicates
+            // 移除上次保存残留的极端 Y 条目，防止重复
             list.removeIf(e -> {
                 int ey = ((CompoundTag) e).contains("Y", 3) ? ((CompoundTag) e).getInt("Y")
                         : ((CompoundTag) e).getByte("Y");

@@ -20,7 +20,7 @@ public class ClientLevelSetBlockMixin {
     // 会被 §7.3 丢弃（写入-丢弃循环风险），源头拒绝更干净。正常交互位置必然在
     // 窗口内（交互距离 ≤ 5 block << 窗口 272 block），拒绝只触发于物理连锁传播
     // 出窗口——服务端权威最终修正（setServerVerifiedBlockState 绕过本注入）。
-    // expandWindowTo 已删除：渲染取数与窗口解耦（decef3e）+ Z 方案每帧拉回，
+    // expandWindowTo 已删除：渲染取数与窗口解耦，相机每帧拉回窗口，
     // 滑窗无意义。
     @SuppressWarnings({ "resource", "null" })
     @Inject(method = "setBlock", at = @At("HEAD"), cancellable = true)

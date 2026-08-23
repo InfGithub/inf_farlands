@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.light;
+package com.inf.farlands.mixin.axisY;
 
 import com.inf.farlands.light.FarLandsLightEngine;
 import net.minecraft.server.level.ChunkMap;
@@ -11,8 +11,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 将 ChunkMap 构造中的 {@code new ThreadedLevelLightEngine}
- * 替换为 {@link FarLandsLightEngine}。
+ * Replace {@code new ThreadedLevelLightEngine} in ChunkMap constructor
+ * with {@link FarLandsLightEngine}.
  */
 @Mixin(ChunkMap.class)
 public class ChunkMapLightEngineMixin {

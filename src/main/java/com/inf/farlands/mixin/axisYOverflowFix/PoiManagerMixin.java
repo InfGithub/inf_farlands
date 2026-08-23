@@ -32,7 +32,7 @@ import org.spongepowered.asm.mixin.Overwrite;
  * getMinSection/getMaxSection 运行时值一致——LevelHeightAccessorMixin 固定）。
  *
  * getOrLoad 是 SectionStorage 的 protected 继承方法——@Shadow 不解析继承方法
- * （note.md #11 教训）→ 反射。**不能用 getOrLoad**：它对无条目 section（极端 Y
+ * → 反射。**不能用 getOrLoad**：它对无条目 section（极端 Y
  * 未预填充）readColumn 读磁盘后仍无 → 抛 IllegalStateException（vanilla 假设
  * 维度范围内必有条目）。改用 **get**（storage 直查，无条目返回 null 不抛）：
  * 正常 Y 等价（readColumn 预填充维度范围 empty）；极端 Y 覆盖内存 POI（刚 add
@@ -51,7 +51,7 @@ public class PoiManagerMixin {
         }
     }
 
-    @SuppressWarnings({ "unchecked", "null" })
+    @SuppressWarnings({ "unchecked" })
     private static Optional<PoiSection> reflectGet(PoiManager self, long sectionKey) {
         try {
             return (Optional<PoiSection>) M_GET.invoke(self, sectionKey);

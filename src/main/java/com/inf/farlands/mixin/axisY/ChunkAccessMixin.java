@@ -56,7 +56,7 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
 
     @Redirect(method = "<init>(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/UpgradeData;Lnet/minecraft/world/level/LevelHeightAccessor;Lnet/minecraft/core/Registry;J[Lnet/minecraft/world/level/chunk/LevelChunkSection;Lnet/minecraft/world/level/levelgen/blending/BlendingData;)V", at = @At(value = "INVOKE", target = "Lorg/slf4j/Logger;warn(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V"), require = 0)
     private void suppressSectionMismatchWarn(Logger logger, String msg, Object a, Object b) {
-        // suppress "Could not set level chunk sections, array length is X instead of Y"
+        // 抑制 section 数组长度不匹配的警告（"Could not set level chunk sections"）
     }
 
     @Unique
@@ -91,7 +91,7 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
         return this.levelHeightAccessor;
     }
 
-    // helpers: LevelChunk uses windowMinY, ProtoChunk uses ServerLevel
+    // 辅助：LevelChunk 用 windowMinY，ProtoChunk 用 ServerLevel
     @Override
     public int windowSectionYFromIndex(int idx) {
         if ((Object) this instanceof LevelChunk) {
@@ -139,8 +139,7 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
 
     // ---------------- redirect sections array size ----------------
 
-    // Replaced by LevelHeightAccessorMixin — getSectionsCount returns window size
-    // globally
+    // 已由 LevelHeightAccessorMixin 替换 —— getSectionsCount 全局返回窗口大小
 
     // ---------------- move sections to allSections ----------------
 
@@ -390,7 +389,7 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
 
     @Overwrite
     public void markPosForPostprocessing(BlockPos pos) {
-        // LevelChunk doesn't support post-processing; silently ignore.
+        // LevelChunk 不支持后处理；静默忽略。
     }
 
     // ---------------- fillBiomesFromNoise ----------------

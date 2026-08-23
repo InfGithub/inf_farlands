@@ -114,9 +114,9 @@ public abstract class NoiseBasedChunkGeneratorMixin {
     // ---- on‑demand fill — 任意 Y 窗口地形生成（预留入口；当前无调用点）----
 
     /**
-     * Fill terrain into chunk sections in {@code [minSection, maxSection]}.
-     * Creates a temporary NoiseChunk with custom NoiseSettings covering the
-     * requested block‑Y range so that beta terrain can generate at any Y.
+     * 把地形填入 {@code [minSection, maxSection]} 范围内的 chunk section。
+     * 创建覆盖所需 block-Y 范围的临时 NoiseChunk（自定义 NoiseSettings），
+     * 使 beta 地形可在任意 Y 生成。
      */
     @SuppressWarnings("null")
     @Unique
@@ -135,9 +135,9 @@ public abstract class NoiseBasedChunkGeneratorMixin {
             if (height % 16 != 0)
                 height = ((height + 15) / 16) * 16;
 
-            // Build custom NoiseSettings covering exactly the window block range.
-            // Use the canonical constructor directly; NoiseSettings.create() would
-            // fail validation at extreme Y because DimensionType.MAX_Y is checked.
+            // 构建恰好覆盖窗口 block 范围的 NoiseSettings。
+            // 直接用规范构造器；NoiseSettings.create() 在极端 Y 会因 DimensionType.MAX_Y
+            // 校验失败。
             NoiseSettings customNS = CTOR_NOISE_SETTINGS.newInstance(
                     minBlockY, height, noiseH, noiseV);
 
@@ -209,7 +209,7 @@ public abstract class NoiseBasedChunkGeneratorMixin {
             int cellsX = 16 / cw;
             int cellsZ = 16 / cw;
 
-            // sync sections array for light engine
+            // 同步 sections 数组供光照引擎使用
             int totalSections = chunk.getMaxSection() - chunk.getMinSection();
             for (int i = 0; i < totalSections; i++) {
                 chunk.getSection(i);

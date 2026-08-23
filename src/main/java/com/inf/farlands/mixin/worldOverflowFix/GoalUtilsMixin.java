@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
 /**
- * 随机走动/逃跑目标生成的 -64/320 拦截（note.md #7）。
+ * 随机走动/逃跑目标生成的 -64/320 拦截。
  *
  * RandomStrollGoal/AvoidEntityGoal → DefaultRandomPos/LandRandomPos/
  * AirAndWaterRandomPos 的 generateRandomPosTowardDirection 用

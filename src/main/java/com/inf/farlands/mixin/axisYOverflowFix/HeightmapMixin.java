@@ -72,12 +72,10 @@ public class HeightmapMixin {
     }
 
     /**
-     * Fix: when server-side ensureCapacity expanded the BitStorage for
-     * extreme-Y heightmap values, the serialised long[] is larger than
-     * the client's default 9-bit allocation. Instead of falling into
-     * primeHeightmaps (which freezes because getHighestSectionPosition
-     * returns an extreme value), rebuild the BitStorage to match the
-     * server's data size and copy directly.
+     * 修复：服务端 ensureCapacity 为极端 Y 高度图值扩容 BitStorage 后，序列化的
+     * long[] 大于客户端默认 9 位分配。不落入 primeHeightmaps（其因
+     * getHighestSectionPosition 返回极端值而冻结），而是重建 BitStorage 匹配
+     * 服务端数据大小并直接复制。
      */
     @Overwrite
     public void setRawData(ChunkAccess chunk, Heightmap.Types type, long[] data) {
@@ -93,9 +91,8 @@ public class HeightmapMixin {
     }
 
     /**
-     * Defence-in-depth: cap the loop in primeHeightmaps so any future
-     * path that reaches it on a chunk whose window covers extreme Y
-     * won't iterate 2.14B times per column.
+     * 纵深防御：钳制 primeHeightmaps 的循环，任何未来路径在窗口覆盖极端 Y 的
+     * chunk 上到达它时，每列不会迭代 21 亿次。
      */
     @SuppressWarnings("removal")
     @Redirect(method = "primeHeightmaps", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/ChunkAccess;getHighestSectionPosition()I"))

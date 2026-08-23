@@ -12,16 +12,15 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 
 /**
- * Light data packet payload replacing vanilla
- * {@code ClientboundLightUpdatePacketData}.
+ * 光照数据包载荷，替代 vanilla 的 {@code ClientboundLightUpdatePacketData}。
  *
- * <p>Encodes absolute section Y per layer (VarInt + 2048-byte array)
- * instead of vanilla's {@code getMinLightSection() + index} scheme.
+ * <p>每层按绝对 section Y 编码（VarInt + 2048 字节数组），而非 vanilla 的
+ * {@code getMinLightSection() + index} 方案。
  */
 @SuppressWarnings({ "null" })
 public class FarLandsLightPacketData {
 
-    final Int2ObjectMap<byte[]> skyLayers;   // sectionY → encoded DataLayer bytes
+    final Int2ObjectMap<byte[]> skyLayers;   // sectionY → 编码后的 DataLayer 字节
     final Int2ObjectMap<byte[]> blockLayers;
 
     /** Server-side: constructed by {@link FarLandsLightEngine#buildLightPacket}. */
@@ -36,10 +35,10 @@ public class FarLandsLightPacketData {
         blockLayers = readLayerMap(buf);
     }
 
-    // ==================== wire format ====================
+    // ==================== 线上格式 ====================
 
     /**
-     * Format: VarInt count → for each: VarInt sectionY + byte[2048].
+     * 格式：VarInt 数量 → 每项：VarInt sectionY + byte[2048]。
      */
     public void write(FriendlyByteBuf buf) {
         writeLayerMap(buf, skyLayers);
@@ -51,7 +50,7 @@ public class FarLandsLightPacketData {
     }
 
     private static void writeLayerMap(FriendlyByteBuf buf, Int2ObjectMap<byte[]> map) {
-        // Sort by sectionY ascending for deterministic ordering
+        // 按 sectionY 升序，保证确定性顺序
         List<Integer> keys = new ArrayList<>(map.keySet());
         keys.sort(Comparator.naturalOrder());
         buf.writeVarInt(keys.size());
@@ -72,11 +71,10 @@ public class FarLandsLightPacketData {
         return map;
     }
 
-    // ==================== client-side apply ====================
+    // ==================== 客户端应用 ====================
 
     /**
-     * Apply received light data to the client engine. Called from
-     * the client packet handler after decoding.
+     * 把收到的光照数据应用到客户端引擎。客户端包处理器解码后调用。
      */
     public void apply(FarLandsLightEngine engine, int cx, int cz) {
         for (var e : skyLayers.int2ObjectEntrySet()) {

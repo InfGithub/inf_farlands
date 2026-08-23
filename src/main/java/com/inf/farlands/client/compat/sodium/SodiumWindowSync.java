@@ -1,5 +1,6 @@
 package com.inf.farlands.client.compat.sodium;
 
+import com.inf.farlands.Config;
 import com.inf.farlands.InfFarlands;
 import com.inf.farlands.WindowedChunk;
 
@@ -118,8 +119,8 @@ public final class SodiumWindowSync {
         int chunkZ = SectionPos.blockToSectionCoord(player.getBlockZ());
         int radius = mc.options.getEffectiveRenderDistance();
 
-        int viewMin = camSecY - WindowedChunk.WINDOW_HALF_BELOW;
-        int viewMax = camSecY + WindowedChunk.WINDOW_HALF_ABOVE;
+        int viewMin = camSecY - Config.verticalSimulationDistance;
+        int viewMax = camSecY + Config.verticalSimulationDistance;
         boolean viewChanged = viewMin != lastDiscardViewMin || viewMax != lastDiscardViewMax;
         long now = System.nanoTime();
         boolean discardNeeded = viewChanged || (now - lastDiscardTime >= 1_000_000_000L);
@@ -180,8 +181,8 @@ public final class SodiumWindowSync {
      */
     private static void removeSectionsOutsideWindow(Object rsm, int cx, int cz, int oldMin, int newMin)
             throws Exception {
-        int oldMax = oldMin + WindowedChunk.WINDOW_HALF_BELOW + WindowedChunk.WINDOW_HALF_ABOVE;
-        int newMax = newMin + WindowedChunk.WINDOW_HALF_BELOW + WindowedChunk.WINDOW_HALF_ABOVE;
+        int oldMax = oldMin + Config.verticalSimulationDistance * 2;
+        int newMax = newMin + Config.verticalSimulationDistance * 2;
         // 下边界滑出（玩家上移）
         for (int sy = oldMin; sy < newMin && sy <= oldMax; sy++) {
             mOnSectionRemoved.invoke(rsm, cx, sy, cz);

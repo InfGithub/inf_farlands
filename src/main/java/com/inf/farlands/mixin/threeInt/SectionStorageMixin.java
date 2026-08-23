@@ -86,8 +86,7 @@ public abstract class SectionStorageMixin {
         int minSection = this.levelHeightAccessor.getMinSection();
         int maxSection = this.levelHeightAccessor.getMaxSection();
 
-        // Always initialize world range first — getOrLoad requires every
-        // section in range to have a non-null Optional in storage.
+        // 先初始化世界范围 —— getOrLoad 要求范围内每个 section 在 storage 都有非 null Optional。
         if (tag == null) {
             for (int i = minSection; i < maxSection; i++) {
                 this.storage.put(SectionPos.asLong(chunkPos.x, i, chunkPos.z), Optional.empty());

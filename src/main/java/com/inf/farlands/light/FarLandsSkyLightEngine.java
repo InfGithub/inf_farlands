@@ -5,9 +5,12 @@ import com.inf.farlands.IntBlockPos;
 import com.inf.farlands.IntSectionPos;
 import com.inf.farlands.WindowedChunk;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.core.BlockPos;
@@ -27,16 +30,15 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * Sky-light engine with sub-region model. No Y-range assumptions.
+ * 天空光引擎，子区域模型。无 Y 范围假设。
  *
- * <p>Propagation algorithm ported from vanilla {@code SkyLightEngine} with
- * three mechanical renames: {@code storingLightForSection} → {@code
- * storage.containsKey}, {@code getStoredLevel} → direct {@code DataLayer.get},
- * {@code setStoredLevel} → direct {@code DataLayer.set}.
+ * <p>传播算法移植自 vanilla {@code SkyLightEngine}，三处机械改名：
+ * {@code storingLightForSection} → {@code storage.containsKey}，
+ * {@code getStoredLevel} → 直接 {@code DataLayer.get}，
+ * {@code setStoredLevel} → 直接 {@code DataLayer.set}。
  *
- * <p>Sky light is partitioned into 256-block sub-regions (16 sections each).
- * The top section of each active sub-region is seeded with
- * {@code DataLayer(15)}. Propagation stops at sub-region boundaries.
+ * <p>天空光按 256 格子区域划分（每区 16 个 section）。每个活跃子区域的顶部
+ * section 以 {@code DataLayer(15)} 播种。传播在子区域边界停止。
  */
 @SuppressWarnings({ "null" })
 public class FarLandsSkyLightEngine implements LayerLightEventListener {
@@ -68,18 +70,50 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     private final long[] lastChunkKeys = new long[2];
     private final LightChunk[] lastChunks = new LightChunk[2];
 
+    // ---- 传播批次局部缓存：引用共享（传播 set DataLayer 数组 = 改 CHM），
+    // 纯读加速（省 CHM.get 的 Long 装箱 + volatile）。任务内单线程，批次入口 clear。----
+    private final Long2ObjectOpenHashMap<DataLayer> taskLocal = new Long2ObjectOpenHashMap<>();
+
+    private DataLayer localGet(long sec) {
+        DataLayer dl = taskLocal.get(sec);
+        if (dl == null) {
+            dl = storage.get(sec);
+            if (dl != null) taskLocal.put(sec, dl);
+        }
+        return dl;
+    }
+
+    private DataLayer localGetOrCreate(long sec) {
+        DataLayer dl = taskLocal.get(sec);
+        if (dl == null) {
+            dl = storage.getOrCreate(sec);
+            taskLocal.put(sec, dl);
+        }
+        return dl;
+    }
+
+    private boolean localContains(long sec) {
+        return taskLocal.containsKey(sec) || storage.containsKey(sec);
+    }
+
     // ---- empty chunk sources (vanilla L21) ----
     private final ChunkSkyLightSources emptyChunkSources;
 
     public FarLandsSkyLightEngine(LightChunkGetter chunkSource) {
+        this(chunkSource, new FarLandsDataLayerStorage(), new ConcurrentHashMap<>());
+    }
+
+    /** 服务端共享 storage/topSections 构造（多个引擎实例共享同一仓库，供并行任务池化复用）。 */
+    FarLandsSkyLightEngine(LightChunkGetter chunkSource, FarLandsDataLayerStorage storage,
+            ConcurrentHashMap<Long, Integer> topSections) {
         this.chunkSource = chunkSource;
-        this.storage = new FarLandsDataLayerStorage();
-        this.topSections = new ConcurrentHashMap<>();
+        this.storage = storage;
+        this.topSections = topSections;
         this.emptyChunkSources = new ChunkSkyLightSources(chunkSource.getLevel());
         Arrays.fill(lastChunkKeys, ChunkPos.INVALID_CHUNK_POS);
     }
 
-    // ==================== public API ====================
+    // ==================== 公共 API ====================
 
     public int getLightValue(long packedPos) {
         IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
@@ -99,7 +133,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
             return 15;
         }
 
-        // Search upward within sub-region
+        // 在子区域内向上搜索
         int subRegion = sy >> 4;
         int topSY = subRegion * 16 + 15;
         for (int s = sy + 1; s <= topSY; s++) {
@@ -107,7 +141,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
             if (dl != null) return dl.get(rx, 0, rz); // 读层底部行（对齐 vanilla flatIndex y=0——遮挡列读 0 防幽灵亮）
         }
 
-        // Above all data or inactive sub-region — virtual sky ceiling
+        // 在所有数据之上或子区域未激活 —— 虚拟天空顶
         return 15;
     }
 
@@ -128,7 +162,19 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         int subRegion = sp.y >> 4;
         int topSY = subRegion * 16 + 15;
         if (sp.y == topSY && dl.isEmpty()) {
-            dl.fill(15);
+            // 区顶虚拟天穹：仅当该列最低光源 <= 区顶底（露天透光到区顶）才 fill 15。
+            // 最低光源在区顶之上（该区顶被上方遮挡）→ 不 fill——深地下实心区顶被填
+            // 15 → 客户端 getLightValue 向上搜索命中区顶 15 → 全亮（破坏出现 15 光束）。
+            ChunkSkyLightSources src = getChunkSources(sp.x, sp.z);
+            if (src == null) {
+                dl.fill(15);
+            } else {
+                int lowest = src.getLowestSourceY(sp.x & 15, sp.z & 15);
+                int topBase = topSY * 16;
+                if (lowest != Integer.MIN_VALUE && lowest <= topBase) {
+                    dl.fill(15);
+                }
+            }
         }
         updateTopSection(sp);
         return dl;
@@ -158,7 +204,43 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         topSections.merge(zeroNode, sp.y + 1, (a, b) -> Math.max(a.intValue(), b.intValue()));
     }
 
-    // ==================== runLightUpdates support ====================
+    // ==================== 服务端 per-chunk 任务入口 ====================
+
+    /**
+     * 处理一个 chunk 的方块变化 + section 变化。任务独占本引擎实例（单线程），
+     * 队列/affectedSections 在任务内消耗。先建层（section 变化）再 checkNode
+     * （方块变化）——checkNode 依赖所在 section 已建层。
+     */
+    public void processBlocksChanged(int chunkX, int chunkZ, Set<BlockPos> positions,
+            Map<Integer, Boolean> sectionChanges) {
+        taskLocal.clear(); // 批次入口
+        blockNodesToCheck.clear(); // 防池化复用残留（任务路径不经 blockNodesToCheck）
+        if (sectionChanges != null) {
+            for (Map.Entry<Integer, Boolean> e : sectionChanges.entrySet()) {
+                updateSectionStatus(SectionPos.of(chunkX, e.getKey(), chunkZ), e.getValue());
+            }
+        }
+        for (BlockPos pos : positions) {
+            // 必须用 asLong()（会 putBlock 注册 side-channel）——直接 hashPos 会 miss，
+            // 传播链反查位解码垃圾坐标 → 光照写错位置 → 损坏。
+            checkNode(pos.asLong());
+        }
+        runPropagation();
+    }
+
+    /**
+     * 处理传播队列 + 通知。方块变化任务与播种任务共用——propagateLightSources 只
+     * enqueue 光源，必须经本方法 propagate 才扩散（原同步模型靠每 tick runLightUpdates）。
+     */
+    public void runPropagation() {
+        taskLocal.clear(); // 批次入口；播种后传播
+        propagateDecreases();
+        propagateIncreases();
+        clearChunkCache();
+        notifyLightChanges();
+    }
+
+    // ==================== runLightUpdates 支持 ====================
 
     @Override
     public boolean hasLightWork() {
@@ -168,6 +250,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     @Override
     public int runLightUpdates() {
         synchronized (queueLock) {
+taskLocal.clear(); // 批次入口
             var it = blockNodesToCheck.iterator();
             while (it.hasNext()) checkNode(it.nextLong());
             blockNodesToCheck.clear();
@@ -205,9 +288,9 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         affectedSections.clear();
     }
 
-    // ==================== propagation ====================
+    // ==================== 传播 ====================
 
-    // ported from LightEngine L164-181
+    // 移植自 LightEngine L164-181
     private int propagateIncreases() {
         int i;
         for (i = 0; increaseQueue.size() >= 2; i++) {
@@ -226,7 +309,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         return i;
     }
 
-    // ported from LightEngine L184-193
+    // 移植自 LightEngine L184-193
     private int propagateDecreases() {
         int i;
         for (i = 0; decreaseQueue.size() >= 2; i++) {
@@ -252,14 +335,14 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     private int getStoredLevel(long packedPos) {
         IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
         long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
-        DataLayer dl = storage.get(sec);
+        DataLayer dl = localGet(sec);
         return dl == null ? 0 : dl.get(bp.x & 15, bp.y & 15, bp.z & 15);
     }
 
     private void setStoredLevel(long packedPos, int level) {
         IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
         long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
-        DataLayer dl = storage.getOrCreate(sec);
+        DataLayer dl = localGetOrCreate(sec);
         dl.set(bp.x & 15, bp.y & 15, bp.z & 15, level);
         markAffected(packedPos);
     }
@@ -274,16 +357,20 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         for (Direction dir : PROPAGATION_DIRECTIONS) {
             if (!LightEngine.QueueEntry.shouldPropagateInDirection(queueEntry, dir)) continue;
 
-            long nPos = BlockPos.offset(packedPos, dir);
-            IntBlockPos nbp = IntBlockPos.getBlockPos(nPos);
-            long nSec = HashUtil.hashSection((long) (nbp.x >> 4), (long) (nbp.y >> 4), (long) (nbp.z >> 4));
-            DataLayer ndl = storage.get(nSec); // 按需建层：先 get，需要写时才 getOrCreate（消除传播白建空层积累）
-            int nVal = ndl == null ? 0 : ndl.get(nbp.x & 15, nbp.y & 15, nbp.z & 15);
+            // C2：内联 BlockPos.offset——复用 src（省 offset 内部反查 + 反查 nPos 两次 CHM.get）
+            int nbpX = src.x + dir.getStepX();
+            int nbpY = src.y + dir.getStepY();
+            int nbpZ = src.z + dir.getStepZ();
+            long nPos = HashUtil.hashPos((long) nbpX, (long) nbpY, (long) nbpZ);
+            HashUtil.putBlock(nPos, new IntBlockPos(nbpX, nbpY, nbpZ));
+            long nSec = HashUtil.hashSection((long) (nbpX >> 4), (long) (nbpY >> 4), (long) (nbpZ >> 4));
+            DataLayer ndl = localGet(nSec); // 按需建层：先 get，需要写时才 getOrCreate（消除传播白建空层积累）
+            int nVal = ndl == null ? 0 : ndl.get(nbpX & 15, nbpY & 15, nbpZ & 15);
 
             int reduced = lightLevel - 1;
             if (reduced <= nVal) continue;
 
-            mutablePos.set(nbp.x, nbp.y, nbp.z);
+            mutablePos.set(nbpX, nbpY, nbpZ);
             BlockState bs1 = getState(mutablePos);
             int afterOpacity = lightLevel - getOpacity(bs1, mutablePos);
             if (afterOpacity <= nVal) continue;
@@ -294,12 +381,18 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
                         : getState(mutablePos.set(src.x, src.y, src.z));
             }
 
-            if (shapeOccludes(packedPos, blockstate, nPos, bs1, dir)) continue;
+            // 形状检查跳过：仅当两方块都 isEmptyShape（getOcclusionShape 都返回
+            // empty，faceShapeOccludes=false）才跳过。注意不能只跳过来源空形状——目标
+            // 的真实面（台阶/条件方块 getFaceOcclusionShape 非空）会让 faceShapeOccludes
+            // 返回 true（遮挡），来源空形状跳过会错误放行（光穿过台阶）。
+            if (!(isEmptyShape(blockstate) && isEmptyShape(bs1))) {
+                if (shapeOccludes(packedPos, blockstate, nPos, bs1, dir)) continue;
+            }
 
             if (ndl == null) {
-                ndl = storage.getOrCreate(nSec);
+                ndl = localGetOrCreate(nSec);
             }
-            ndl.set(nbp.x & 15, nbp.y & 15, nbp.z & 15, afterOpacity);
+            ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, afterOpacity);
             markAffected(nPos);
             if (afterOpacity > 1) {
                 enqueueIncrease(nPos, LightEngine.QueueEntry.increaseSkipOneDirection(
@@ -314,22 +407,27 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     private void propagateDecrease(long packedPos, long lightLevel) {
         int emptyBelow = countEmptySectionsBelowIfAtBorder(packedPos);
         int fromLevel = LightEngine.QueueEntry.getFromLevel(lightLevel);
+        IntBlockPos src = IntBlockPos.getBlockPos(packedPos);
 
         for (Direction dir : PROPAGATION_DIRECTIONS) {
             if (!LightEngine.QueueEntry.shouldPropagateInDirection(lightLevel, dir)) continue;
 
-            long nPos = BlockPos.offset(packedPos, dir);
-            IntBlockPos nbp = IntBlockPos.getBlockPos(nPos);
-            long nSec = HashUtil.hashSection((long) (nbp.x >> 4), (long) (nbp.y >> 4), (long) (nbp.z >> 4));
-            if (!storage.containsKey(nSec)) continue;
+            // C2：内联 BlockPos.offset——复用 src（省 offset 内部反查 + 反查 nPos 两次 CHM.get）
+            int nbpX = src.x + dir.getStepX();
+            int nbpY = src.y + dir.getStepY();
+            int nbpZ = src.z + dir.getStepZ();
+            long nPos = HashUtil.hashPos((long) nbpX, (long) nbpY, (long) nbpZ);
+            HashUtil.putBlock(nPos, new IntBlockPos(nbpX, nbpY, nbpZ));
+            long nSec = HashUtil.hashSection((long) (nbpX >> 4), (long) (nbpY >> 4), (long) (nbpZ >> 4));
+            if (!localContains(nSec)) continue;
 
-            DataLayer ndl = storage.get(nSec);
+            DataLayer ndl = localGet(nSec);
             if (ndl == null) continue;
-            int nVal = ndl.get(nbp.x & 15, nbp.y & 15, nbp.z & 15);
+            int nVal = ndl.get(nbpX & 15, nbpY & 15, nbpZ & 15);
             if (nVal == 0) continue;
 
             if (nVal <= fromLevel - 1) {
-                ndl.set(nbp.x & 15, nbp.y & 15, nbp.z & 15, 0);
+                ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, 0);
                 markAffected(nPos);
                 enqueueDecrease(nPos, LightEngine.QueueEntry.decreaseSkipOneDirection(nVal, dir.getOpposite()));
                 propagateFromEmptySections(nPos, dir, nVal, false, emptyBelow);
@@ -347,13 +445,18 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         int x = bp.x, y = bp.y, z = bp.z;
         long secKey = HashUtil.hashSection((long) (x >> 4), (long) (y >> 4), (long) (z >> 4));
 
+        // vanilla 用 storage.lightOnInSection 门：无光源列（getLowestSourceY 返回
+        // MIN_VALUE）不 updateSourcesInColumn、按清光分支处理。我们无 columnsWithSources，
+        // 用 hasSource（!= MIN_VALUE）等价判断——否则 MIN_VALUE 会被 updateSourcesInColumn
+        // 传给 addSourcesAbove 从 int 边界填 15（全亮火把样）。
         int lowestY = getLowestSourceY(x, z);
-        if (lowestY != Integer.MAX_VALUE) {
+        boolean hasSource = lowestY != Integer.MIN_VALUE;
+        if (hasSource) {
             updateSourcesInColumn(x, z, lowestY);
         }
 
-        if (storage.containsKey(secKey)) {
-            if (y >= lowestY) {
+        if (localContains(secKey)) {
+            if (hasSource && y >= lowestY) {
                 enqueueDecrease(levelPos, REMOVE_SKY_SOURCE_ENTRY);
                 enqueueIncrease(levelPos, ADD_SKY_SOURCE_ENTRY);
             } else {
@@ -384,7 +487,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         int count = 0;
 
         while (sy - count - 1 >= bottomSY
-                && !storage.containsKey(HashUtil.hashSection((long) cx, (long) (sy - count - 1), (long) cz))) {
+                && !localContains(HashUtil.hashSection((long) cx, (long) (sy - count - 1), (long) cz))) {
             count++;
         }
         return count;
@@ -406,7 +509,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
 
         for (int sy = startSY; sy >= endSY; sy--) {
             long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
-            DataLayer dl = storage.getOrCreate(secKey);
+            DataLayer dl = localGetOrCreate(secKey);
             int blockY = sy << 4;
             for (int ry = 15; ry >= 0; ry--) {
                 long bPos = HashUtil.hashPos((long) x, (long) (blockY + ry), (long) z);
@@ -446,7 +549,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         return !state.canOcclude() || !state.useShapeForLightOcclusion();
     }
 
-    // ==================== sky sources ====================
+    // ==================== 天空光源 ====================
 
     private int getLowestSourceY(int x, int z) {
         ChunkSkyLightSources src = getChunkSources(x >> 4, z >> 4);
@@ -515,7 +618,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
             int topY = baseY + 15;
 
             // long 化防溢出：topY = baseY + 15 在 2.14B（sy=MAX_CHUNK）时 = Integer.MAX_VALUE，
-            // int by++ 溢出为负 → 无限循环 → DataLayer.get 越界 CTD（#24/#36/#38 同族）。
+            // int by++ 溢出为负 → 无限循环 → DataLayer.get 越界 CTD。
             for (long by = Math.max((long) baseY, (long) effectiveMax); by <= topY; by++) {
                 long bKey = HashUtil.hashPos((long) x, by, (long) z);
                 HashUtil.putBlock(bKey, new IntBlockPos(x, (int) by, z));
@@ -555,7 +658,11 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         int cx = pos.x, cz = pos.z;
         ChunkSkyLightSources sources = java.util.Objects.requireNonNullElse(
                 getChunkSources(cx, cz), emptyChunkSources);
-        int highestLowest = sources.getHighestLowestSourceY() - 1;
+        // 无光源（getHighestLowestSourceY 返回 MIN_VALUE，如未 fillFrom 的 LevelChunk）
+        // → 无区顶 15——否则 MIN_VALUE-1 溢出成 int max → 遍历垃圾 section 建层 fill 15。
+        int highestLowest = sources.getHighestLowestSourceY();
+        if (highestLowest == Integer.MIN_VALUE) return;
+        highestLowest -= 1;
         int startSY = (highestLowest >> 4) + 1;
 
         int subRegion = startSY >> 4;
@@ -619,7 +726,9 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
                 for (int rx = 0; rx < 16; rx++) {
                     for (int rz = 0; rz < 16; rz++) {
                         int lowest0 = s0.getLowestSourceY(rx, rz);
-                        if (lowest0 > maxY) continue;
+                        // 无光源列（MIN_VALUE，如未 fillFrom 的 LevelChunk）→ 不播种——
+                        // 否则 for 循环 max(baseY, MIN_VALUE)=baseY 填整个 section 15。
+                        if (lowest0 == Integer.MIN_VALUE || lowest0 > maxY) continue;
 
                         int lowestN = rz == 0 ? sN.getLowestSourceY(rx, 15) : s0.getLowestSourceY(rx, rz - 1);
                         int lowestS = rz == 15 ? sS.getLowestSourceY(rx, 0) : s0.getLowestSourceY(rx, rz + 1);
@@ -642,7 +751,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         }
     }
 
-    // ==================== chunk cache ====================
+    // ==================== chunk 缓存 ====================
 
     private LightChunk getChunk(int cx, int cz) {
         long key = ChunkPos.asLong(cx, cz);
@@ -662,7 +771,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         Arrays.fill(lastChunks, null);
     }
 
-    // ==================== block access ====================
+    // ==================== 方块访问 ====================
 
     private BlockState getState(BlockPos pos) {
         int cx = pos.getX() >> 4;

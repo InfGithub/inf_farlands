@@ -31,6 +31,7 @@ public abstract class ScatteredFeaturePieceMixin {
     @Shadow
     protected int heightPosition;
 
+    @SuppressWarnings("deprecation")
     @Overwrite
     protected boolean updateHeightPositionToLowestGroundHeight(LevelAccessor level, int height) {
         if (this.heightPosition >= 0) {

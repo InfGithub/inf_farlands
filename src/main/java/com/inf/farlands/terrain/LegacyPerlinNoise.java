@@ -3,9 +3,9 @@ package com.inf.farlands.terrain;
 import net.minecraft.util.RandomSource;
 
 /**
- * Byte-for-byte port of beta 1.7.3 {@code NoiseGeneratorPerlin}.
- * Uses {@code (int)} cast for floor, which overflows at 2^31,
- * producing the classic Far Lands terrain anomaly.
+ * beta 1.7.3 {@code NoiseGeneratorPerlin} 的逐字节移植。
+ * 用 {@code (int)} 强转做 floor，在 2^31 处溢出，
+ * 产生经典的边境之地地形异常。
  */
 public final class LegacyPerlinNoise {
 

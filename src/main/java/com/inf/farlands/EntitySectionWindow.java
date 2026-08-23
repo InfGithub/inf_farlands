@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * 实体 section 窗口并集（服务端主线程，每 tick 由 InfFarlands.onServerTick 更新）。
  *
- * 方案 D（实体离开窗口冻结）：PersistentEntitySectionManager.updateChunkStatus 与
+ * 实体离开窗口冻结：PersistentEntitySectionManager.updateChunkStatus 与
  * EntitySectionStorage.createSection 用本类的 inAnyWindow 把窗口外 section 的
  * visibility 从 TICKING 降为 TRACKED——实体不 tick、保留 accessible。
  * 窗口 = 玩家 sectionY ±17/+16（与随机刻 ServerLevelMixin.tickChunk 一致）。
@@ -35,8 +35,8 @@ public final class EntitySectionWindow {
         for (int i = 0; i < n; i++) {
             ServerPlayer p = players.get(i);
             int c = Mth.floorDiv(p.getBlockY(), 16);
-            list[i][0] = c - WindowedChunk.WINDOW_HALF_BELOW;
-            list[i][1] = c + WindowedChunk.WINDOW_HALF_ABOVE;
+            list[i][0] = c - Config.verticalSimulationDistance;
+            list[i][1] = c + Config.verticalSimulationDistance;
         }
         Arrays.sort(list, Comparator.comparingInt(a -> a[0]));
         int[] merged = new int[n * 2];

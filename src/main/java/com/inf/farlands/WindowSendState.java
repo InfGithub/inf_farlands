@@ -47,7 +47,7 @@ public final class WindowSendState {
     @SuppressWarnings("null")
     public static List<Map.Entry<Integer, LevelChunkSection>> sendableSections(LevelChunk chunk) {
         int minY = windowMinY(chunk);
-        int maxY = minY + WindowedChunk.WINDOW_HALF_BELOW + WindowedChunk.WINDOW_HALF_ABOVE;
+        int maxY = minY + Config.verticalSimulationDistance * 2;
         List<Map.Entry<Integer, LevelChunkSection>> out = new ArrayList<>();
         for (Map.Entry<Integer, LevelChunkSection> e : ((WindowedChunk) chunk).windowedAllSections().entrySet()) {
             int sy = e.getKey();

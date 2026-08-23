@@ -1,7 +1,7 @@
 package com.inf.farlands;
 
 /**
- * 服务端实体 section 存储标记（方案 A）。
+ * 服务端实体 section 存储标记。
  *
  * EntitySectionStorage 双端共享（服务端 PersistentEntitySectionManager /
  * 客户端 TransientEntitySectionManager 都用它）——createSection 的窗口过滤

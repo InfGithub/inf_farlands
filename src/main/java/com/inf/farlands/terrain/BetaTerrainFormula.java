@@ -6,11 +6,10 @@ public final class BetaTerrainFormula {
     private static final double CELL_V = 8.0;
     private static final double MID_Y = 68.0;
     private static final double MID_Y_CELL = MID_Y / CELL_V;
-    // = 1/256. Beta used noise/512 (=1/512) for its 128-block world;
-    // modern MC has 384 blocks so the scale doubles proportionally.
+    // = 1/256。Beta 用 noise/512（=1/512）适配其 128 格世界；现代 MC 有 384 格，
+    // 比例相应加倍。
     private static final double heightScale = 256.0 / 65536.0;
-    // Beta clamps the top 4 cells (top 32 blocks) to force air.
-    // For modern 384-block world, clamp from y=288 (cy=center of cell 36).
+    // Beta 将顶部 4 个 cell（顶部 32 格）钳制为空气。现代 384 格世界从 y=288 开始钳制。
     private static final double CLAMP_START_CELL = 35.0;
     private static final double CLAMP_RANGE = 4.0;
 
@@ -24,8 +23,8 @@ public final class BetaTerrainFormula {
         double cy = blockY / CELL_V;
         double cz = blockZ / CELL_H;
 
-        // Integer cell coords for channels 0/1 — matches beta's cell-grid sampling.
-        // Channel 2 uses floating (low freq) for smooth lerp transitions.
+        // 通道 0/1 用整数 cell 坐标，匹配 beta 的 cell 网格采样。
+        // 通道 2 用浮点坐标（低频），保证 lerp 过渡平滑。
         int cellX = Math.floorDiv(blockX, (int) CELL_H);
         int cellY = Math.floorDiv(blockY, (int) CELL_V);
         int cellZ = Math.floorDiv(blockZ, (int) CELL_H);
@@ -36,10 +35,9 @@ public final class BetaTerrainFormula {
 
         double height = lerp(lower, upper, blend) * heightScale;
 
-        // Beta's WorldChunkManager temperature/humidity were in [0, 1].
-        // Modern MC biome temperature can be negative (frozen) or >1 (desert),
-        // which would make var25 negative and tFactor negative, flipping the
-        // bias direction and sending terrain to the sky.
+        // Beta 的 WorldChunkManager 温湿度在 [0, 1]。现代 MC 群系温度可能为负
+        // （冻原）或 >1（沙漠），会使 var25 与 tFactor 为负，翻转 bias 方向，
+        // 把地形送到天上。
         double climateProduct = Math.max(0.0, Math.min(1.0, humidity * temperature));
         double tFactor = 1.0 - climateProduct;
         tFactor = tFactor * tFactor;
@@ -49,11 +47,11 @@ public final class BetaTerrainFormula {
         noiseFactor = clamp(noiseFactor, 0.0, 1.0);
         tFactor = tFactor * noiseFactor + 0.5;
 
-        // Beta uses noise humidity (field_4181_h / 8000.0) for sea-level shift,
-        // not biome humidity. Range ~[-8, 8] before adjustment → ±12 blocks.
+        // Beta 用噪声湿度（field_4181_h / 8000.0）调海平面，非群系湿度。
+        // 调整前范围约 [-8, 8] → 调整后 ±12 格。
         double noiseHumidity = noise.sample(4, cx, 0.0, cz) / 8000.0;
         double hSea = adjustHumiditySeaLevel(noiseHumidity);
-        // Beta: when humidity noise < 0 (dry), var27 = 0.0; ... var27 += 0.5
+        // Beta：湿度噪声 < 0（干燥）时 var27 = 0.0；... var27 += 0.5
         if (noiseHumidity < 0.0)
             tFactor = 0.5;
         double yMidCell = MID_Y_CELL + hSea * 4.0;
@@ -65,7 +63,7 @@ public final class BetaTerrainFormula {
 
         double density = height - bias;
 
-        // Beta: top cells ramp density to -10 to force air at world ceiling.
+        // Beta：顶部 cell 将 density 渐变到 -10，在世界顶强制为空气。
         if (cy > CLAMP_START_CELL) {
             double t = Math.min(1.0, (cy - CLAMP_START_CELL) / CLAMP_RANGE);
             density = density * (1.0 - t) + (-10.0) * t;
