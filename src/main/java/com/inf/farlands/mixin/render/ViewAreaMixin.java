@@ -74,19 +74,24 @@ public abstract class ViewAreaMixin {
         long baseZ = (long) iz - 8 - spanZ / 2;
 
         for (int kx = 0; kx < this.sectionGridSizeX; kx++) {
-            long originX = baseX + Math.floorMod((long) kx * 16 - baseX, spanX);
+            // origin 饱和到 int 边界（非可玩范围）：缓冲带 chunk（134217727，block
+            // 2147483632~2147483647，int 可表示）保留独立 origin → 独立渲染（空气），
+            // 不再折叠到 134217726；仅超 int 位置（2147483648+，不可表示）饱和到
+            // int max。setOrigin 的 AABB(x, x+16) 已 long 化（RenderSectionSetOriginMixin），
+            // relativeOrigins 的 ±16 溢出保留（超界方向 isInViewDistance 过滤，安全）。
+            int originX = saturateInt(baseX + Math.floorMod((long) kx * 16 - baseX, spanX));
 
             for (int kz = 0; kz < this.sectionGridSizeZ; kz++) {
-                long originZ = baseZ + Math.floorMod((long) kz * 16 - baseZ, spanZ);
+                int originZ = saturateInt(baseZ + Math.floorMod((long) kz * 16 - baseZ, spanZ));
 
                 for (int ky = 0; ky < this.sectionGridSizeY; ky++) {
-                    long originY = baseY + Math.floorMod((long) ky * 16 - baseY, spanY);
+                    int originY = saturateInt(baseY + Math.floorMod((long) ky * 16 - baseY, spanY));
 
                     SectionRenderDispatcher.RenderSection section = this.sections[gridIndex(kx, ky, kz)];
                     BlockPos origin = section.getOrigin();
-                    if ((int) originX != origin.getX() || (int) originY != origin.getY()
-                            || (int) originZ != origin.getZ()) {
-                        section.setOrigin((int) originX, (int) originY, (int) originZ);
+                    if (originX != origin.getX() || originY != origin.getY()
+                            || originZ != origin.getZ()) {
+                        section.setOrigin(originX, originY, originZ);
                     }
                 }
             }
@@ -110,6 +115,12 @@ public abstract class ViewAreaMixin {
                 }
             }
         }
+    }
+
+    /** long → int 饱和（Java double→int 语义一致）：超界 origin 饱和到 int 边界，不截断。 */
+    private static int saturateInt(long v) {
+        return v > Integer.MAX_VALUE ? Integer.MAX_VALUE
+                : v < Integer.MIN_VALUE ? Integer.MIN_VALUE : (int) v;
     }
 
     @Overwrite

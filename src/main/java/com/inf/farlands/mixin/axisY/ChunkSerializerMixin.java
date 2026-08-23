@@ -127,7 +127,10 @@ public class ChunkSerializerMixin {
             });
             for (Map.Entry<Integer, LevelChunkSection> kv : all.entrySet()) {
                 int sy = kv.getKey();
-                if (sy >= lMin - 1 && sy <= lMax)
+                // 跳过维度 section 范围 [-4, 19]（vanilla 循环处理）；-5/20（light 范围边界、
+                // vanilla 数组越界不写方块）与极端 Y 由本方法补写——原范围 [-5,20] 漏 -5/20
+                // 方块持久化（下界传送门往返重载后 y=320~335 / y=-96~-81 变空气）
+                if (sy >= lMin && sy < lMax)
                     continue;
 
                 LevelChunkSection s = kv.getValue();
@@ -200,7 +203,8 @@ public class ChunkSerializerMixin {
             for (int i = 0; i < list.size(); i++) {
                 CompoundTag entry = list.getCompound(i);
                 int sy = entry.contains("Y", 3) ? entry.getInt("Y") : entry.getByte("Y");
-                if (sy >= lMin - 1 && sy <= lMax)
+                // 恢复维度 section 范围外（含 -5/20 的 append 补写 entry——vanilla read 数组越界不恢复）
+                if (sy >= lMin && sy < lMax)
                     continue;
 
                 if (entry.contains("block_states", 10) && entry.contains("biomes", 10)) {

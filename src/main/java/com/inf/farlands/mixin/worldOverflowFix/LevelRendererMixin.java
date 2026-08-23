@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.render;
+package com.inf.farlands.mixin.worldOverflowFix;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;

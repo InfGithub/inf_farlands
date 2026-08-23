@@ -5,10 +5,10 @@ import com.inf.farlands.IntBlockPos;
 import com.inf.farlands.IntSectionPos;
 import com.inf.farlands.WindowedChunk;
 
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -51,7 +51,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     // ---- storage ----
     final FarLandsDataLayerStorage storage;
     /** Column-key → highest section Y that has a non-null DataLayer in storage. */
-    private final Long2IntOpenHashMap topSections;
+    private final ConcurrentHashMap<Long, Integer> topSections;
 
     // ---- propagation queues ----
     private final LongArrayFIFOQueue increaseQueue = new LongArrayFIFOQueue();
@@ -74,8 +74,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     public FarLandsSkyLightEngine(LightChunkGetter chunkSource) {
         this.chunkSource = chunkSource;
         this.storage = new FarLandsDataLayerStorage();
-        this.topSections = new Long2IntOpenHashMap();
-        this.topSections.defaultReturnValue(Integer.MIN_VALUE);
+        this.topSections = new ConcurrentHashMap<>();
         this.emptyChunkSources = new ChunkSkyLightSources(chunkSource.getLevel());
         Arrays.fill(lastChunkKeys, ChunkPos.INVALID_CHUNK_POS);
     }
@@ -92,9 +91,11 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         if (dl != null) return dl.get(rx, ry, rz);
 
         // 快速失败：该列最高有层 section ≤ 当前 → 区内（sy+1..topSY）必无层 → 搜索必返回 15。
-        // topSections 只增不减（updateTopSection 的 if (cur < sp.y+1) put）、初始 MIN_VALUE，
+        // topSections 只增不减（merge max）、初始无条目（null 等价旧 MIN_VALUE）——
         // stale（remove 不更新）时只偏高不偏低 → 快速失败结果与搜索严格一致，绝不误判。
-        if (topSections.get(HashUtil.hashSection((long) cx, 0, (long) cz)) <= sy) {
+        // CHM 弱一致读到旧值（偏低）→ 快速失败不触发 → 走搜索 → 结果仍正确。
+        Integer top = topSections.get(HashUtil.hashSection((long) cx, 0, (long) cz));
+        if (top == null || top <= sy) {
             return 15;
         }
 
@@ -140,8 +141,10 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
             IntSectionPos sp = HashUtil.getSection(key);
             return sp != null && sp.x == cx && sp.z == cz;
         });
-        // topSections 故意不清：stale 偏高 → O1 快速失败不触发（安全），且避免对非线程安全
-        // Long2IntOpenHashMap 的并发写（卸载在异步线程）。
+        // topSections 故意不清：stale 偏高 → O1 快速失败不触发（安全）。
+        // ConcurrentHashMap：initializeLight（commonPool 异步）与主线程（setDataLayer/
+        // updateSectionStatus）并发写安全（原 Long2IntOpenHashMap 并发写 → rehash 损坏
+        // → AIOOBE CTD，2026-08-23 实崩）。
     }
 
     public void setDataLayer(long sectionKey, DataLayer layer) {
@@ -151,10 +154,8 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
 
     private void updateTopSection(IntSectionPos sp) {
         long zeroNode = HashUtil.hashSection((long) sp.x, 0, (long) sp.z);
-        int cur = topSections.get(zeroNode);
-        if (cur < sp.y + 1) {
-            topSections.put(zeroNode, sp.y + 1);
-        }
+        // 原子"只增不减"：absent → sp.y+1；present → max（原 if (cur < sp.y+1) put）
+        topSections.merge(zeroNode, sp.y + 1, (a, b) -> Math.max(a.intValue(), b.intValue()));
     }
 
     // ==================== runLightUpdates support ====================

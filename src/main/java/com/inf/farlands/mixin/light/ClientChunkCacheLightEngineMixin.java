@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.axisY;
+package com.inf.farlands.mixin.light;
 
 import com.inf.farlands.light.FarLandsLightEngine;
 import net.minecraft.client.Minecraft;
