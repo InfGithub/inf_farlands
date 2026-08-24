@@ -30,7 +30,9 @@ import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
+import net.minecraft.world.level.lighting.BlockLightEngine;
 import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.lighting.SkyLightEngine;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -77,7 +79,7 @@ public class ChunkSerializerMixin {
             for (int i = min; i < max; i++) {
                 LevelChunkSection s = all.get(i);
                 if (s == null) {
-                    s = chunk.getSection(lha.getSectionIndexFromSectionY(i));
+                    s = chunk.getSection(chunk.getSectionIndexFromSectionY(i));
                 }
                 arr[i - min] = s;
             }
@@ -139,11 +141,11 @@ public class ChunkSerializerMixin {
                 DataLayer bl = le.getLayerListener(LightLayer.BLOCK).getDataLayerData(SectionPos.of(cpos, sy));
                 DataLayer sl = le.getLayerListener(LightLayer.SKY).getDataLayerData(SectionPos.of(cpos, sy));
                 // updating 兜底：层未 swap 时 getDataLayerData（queued ∪ visible）可能为 null
-                if (bl == null && blListener instanceof net.minecraft.world.level.lighting.BlockLightEngine ble) {
+                if (bl == null && blListener instanceof BlockLightEngine ble) {
                     bl = HashUtil.callGetDataLayer(HashUtil.blockStorage(ble),
                             SectionPos.asLong(cpos.x, sy, cpos.z), true);
                 }
-                if (sl == null && slListener instanceof net.minecraft.world.level.lighting.SkyLightEngine sle) {
+                if (sl == null && slListener instanceof SkyLightEngine sle) {
                     sl = HashUtil.callGetDataLayer(HashUtil.skyStorage(sle),
                             SectionPos.asLong(cpos.x, sy, cpos.z), true);
                 }

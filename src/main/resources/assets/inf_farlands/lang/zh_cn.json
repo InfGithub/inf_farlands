@@ -9,5 +9,10 @@
   "advancements.inf_farlands.corner_far.title": "边境之角",
   "advancements.inf_farlands.corner_far.description": "原来世界是九十度的？",
   "commands.inf_farlands.section.light.dump": "Section 光照数据已写入服务端日志。",
-  "commands.inf_farlands.client.section.light.dump": "Section 光照数据已写入客户端日志。"
+  "commands.inf_farlands.client.section.light.dump": "Section 光照数据已写入客户端日志。",
+  "commands.inf_farlands.section.biome.dump": "Section 生物群系数据已写入服务端日志。",
+  "commands.inf_farlands.client.section.biome.dump": "Section 生物群系数据已写入客户端日志。",
+  "commands.inf_farlands.clamp.on": "钳制模式：开启",
+  "commands.inf_farlands.clamp.off": "钳制模式：关闭",
+  "commands.inf_farlands.clamp.no_permission": "钳制模式：需要 OP 权限"
 }

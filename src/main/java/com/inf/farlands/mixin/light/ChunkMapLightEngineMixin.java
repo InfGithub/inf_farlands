@@ -2,6 +2,7 @@ package com.inf.farlands.mixin.light;
 
 import com.inf.farlands.light.FarLandsLightEngine;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.util.thread.ProcessorHandle;
 import net.minecraft.util.thread.ProcessorMailbox;
@@ -21,7 +22,7 @@ public class ChunkMapLightEngineMixin {
     private ThreadedLevelLightEngine redirectNewLightEngine(
             LightChunkGetter lightChunk, ChunkMap chunkMap, boolean skyLight,
             ProcessorMailbox<Runnable> taskMailbox,
-            ProcessorHandle<net.minecraft.server.level.ChunkTaskPriorityQueueSorter.Message<Runnable>> sorterMailbox) {
+            ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> sorterMailbox) {
         return new FarLandsLightEngine(lightChunk, chunkMap, skyLight, taskMailbox, sorterMailbox);
     }
 }

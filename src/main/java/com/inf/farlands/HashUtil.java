@@ -5,6 +5,9 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.mojang.datafixers.util.Pair;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+
 import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.lighting.BlockLightEngine;
@@ -51,6 +54,31 @@ public class HashUtil {
     }
 
     // ------------------------------------------------------------
+    // Aquifer 专用持久表：aquiferLocationCache 跨 tick 长期反查 block 哈希 key，
+    // 通用 blockLookup（swap 瞬态，400 tick 无条件丢弃）会 miss → fallback 位解码
+    // 垃圾坐标污染。专用表用 lastAccess 保活（生成期活跃不清理），反查不 miss。
+
+    private static final Map<Long, IntBlockPos> aquiferLookup = new ConcurrentHashMap<>();
+
+    public static IntBlockPos getAquiferBlock(long key) {
+        IntBlockPos bp = aquiferLookup.get(key);
+        if (bp != null) {
+            bp.lastAccess = InfFarlands.getServerTickCount();
+        }
+        return bp;
+    }
+
+    public static void putAquiferBlock(long key, IntBlockPos val) {
+        val.lastAccess = InfFarlands.getServerTickCount();
+        aquiferLookup.put(key, val);
+    }
+
+    public static void trimAquiferLookup(long currentTick) {
+        long cutoff = currentTick - 600;
+        aquiferLookup.values().removeIf(p -> p.lastAccess < cutoff);
+    }
+
+    // ------------------------------------------------------------
 
     public static long hashSection(long x, long y, long z) {
         return hashPos(x, y, z);
@@ -91,6 +119,7 @@ public class HashUtil {
         long cutoff = currentTick - 600;
         swapBlockLookup();
         sectionLookup.values().removeIf(p -> p.lastAccess < cutoff);
+        trimAquiferLookup(currentTick);
     }
 
     // ============ LayerLightSectionStorage helpers ============
@@ -299,9 +328,9 @@ public class HashUtil {
     /**入队 PRE_UPDATE 任务（直写 lightTasks + tryScheduleUpdate 触发调度） */
     public static void enqueuePreUpdateTask(ThreadedLevelLightEngine engine, int cx, int cz, Runnable task) {
         try {
-            it.unimi.dsi.fastutil.objects.ObjectList lightTasks =
-                    (it.unimi.dsi.fastutil.objects.ObjectList) F_LIGHT_TASKS.get(engine);
-            lightTasks.add(com.mojang.datafixers.util.Pair.of(PRE_UPDATE, task));
+            ObjectList lightTasks =
+                    (ObjectList) F_LIGHT_TASKS.get(engine);
+            lightTasks.add(Pair.of(PRE_UPDATE, task));
             engine.tryScheduleUpdate();
         } catch (Exception e) {
             throw new RuntimeException(e);

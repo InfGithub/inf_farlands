@@ -5,6 +5,7 @@ import net.minecraft.core.Direction;
 
 public class IntBlockPos {
     public final int x, y, z;
+    public volatile long lastAccess;
 
     public IntBlockPos(int x, int y, int z) {
         this.x = x;

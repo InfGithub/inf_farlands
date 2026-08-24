@@ -11,14 +11,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.util.Unit;
+import net.minecraft.util.thread.BlockableEventLoop;
+import net.minecraft.util.thread.ProcessorHandle;
+import net.minecraft.util.thread.ProcessorMailbox;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -64,11 +69,10 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     /** Server-side constructor called via {@code ChunkMap}. */
     public FarLandsLightEngine(
             LightChunkGetter chunkSource,
-            net.minecraft.server.level.ChunkMap chunkMap,
+            ChunkMap chunkMap,
             boolean skyLight,
-            net.minecraft.util.thread.ProcessorMailbox<Runnable> taskMailbox,
-            net.minecraft.util.thread.ProcessorHandle<
-                net.minecraft.server.level.ChunkTaskPriorityQueueSorter.Message<Runnable>> sorterMailbox) {
+            ProcessorMailbox<Runnable> taskMailbox,
+            ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> sorterMailbox) {
         super(chunkSource, chunkMap, skyLight, taskMailbox, sorterMailbox);
         this.chunkSource = chunkSource;
         this.serverSide = true;
@@ -94,7 +98,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     /** Client-side constructor called via {@code ClientChunkCache}. */
     public FarLandsLightEngine(LightChunkGetter chunkSource, boolean hasSkyLight) {
         super(chunkSource, null, hasSkyLight,
-                net.minecraft.util.thread.ProcessorMailbox.create(
+                ProcessorMailbox.create(
                         net.minecraft.Util.backgroundExecutor(), "farlands-light"),
                 null);
         this.chunkSource = chunkSource;
@@ -112,7 +116,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     @Override
     public void close() {
         if (lightPool != null) {
-            lightPool.shutdown();
+            lightPool.shutdownNow(); // 强制中断，防池线程卡任务不退出（线程池泄漏）
         }
     }
 
@@ -244,10 +248,10 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     @Override
     public void queueSectionData(LightLayer layer, SectionPos pos, DataLayer data) {
         if (layer == LightLayer.BLOCK) {
-            if (data != null) blockEngine.setDataLayer(pos.asLong(), data);
+            if (data != null) blockEngine.setDataLayer(pos.asLong(), data, ChunkPos.asLong(pos.x(), pos.z()));
             else blockEngine.updateSectionStatus(pos, true);
         } else if (skyEngine != null) {
-            if (data != null) skyEngine.setDataLayer(pos.asLong(), data);
+            if (data != null) skyEngine.setDataLayer(pos.asLong(), data, ChunkPos.asLong(pos.x(), pos.z()));
             else skyEngine.updateSectionStatus(pos, true);
         }
     }
@@ -367,7 +371,11 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     /** 唤醒后台调度循环（CAS 单例；已在跑则跳过）。 */
     private void wakeConsumer() {
         if (consumerActive.compareAndSet(false, true)) {
-            lightPool.submit(this::drainLight);
+            try {
+                lightPool.submit(this::drainLight);
+            } catch (RejectedExecutionException e) {
+                consumerActive.set(false); // 池已关闭，回滚激活标志
+            }
         }
     }
 
@@ -443,6 +451,9 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         } finally {
             taskLock.unlock(cx, cz);
             tasks.onComplete.complete(null);
+            // 任务完成补唤醒：防 drainLight 单例漏调度——残留任务由在跑任务的
+            // 完成链式续接（light future 落地 → 生成继续 → getChunk 解除阻塞）
+            wakeConsumer();
             // ticket 移除必须主线程（ScalableLux：ticket 操作非线程安全）
             mainExecutor().execute(() -> {
                 if (queue.removeWorkRef(tasks.chunkKey) <= 0) {
@@ -490,10 +501,10 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     }
 
     @SuppressWarnings({"resource", "unchecked"})
-    private net.minecraft.util.thread.BlockableEventLoop<Runnable> mainExecutor() {
+    private BlockableEventLoop<Runnable> mainExecutor() {
         ServerLevel level = (ServerLevel) chunkSource.getLevel();
         try {
-            return (net.minecraft.util.thread.BlockableEventLoop<Runnable>) F_MAIN_EXECUTOR.get(level.getChunkSource().chunkMap);
+            return (BlockableEventLoop<Runnable>) F_MAIN_EXECUTOR.get(level.getChunkSource().chunkMap);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

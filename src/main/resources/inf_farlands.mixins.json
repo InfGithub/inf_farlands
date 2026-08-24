@@ -17,6 +17,7 @@
 
     "axisY.ChunkAccessMixin",
     "axisY.ChunkGeneratorMixin",
+    "axisY.ServerChunkCacheMixin",
     "light.ChunkMapLightEngineMixin",
     "axisY.ChunkMapMixin",
     "axisY.ChunkSerializerMixin",
@@ -65,6 +66,11 @@
     "render.RenderSectionMixin",
     "render.SectionOcclusionGraphMixin",
     "render.ViewAreaMixin",
+
+    "tool.clamp.EntityCollisionMixin",
+    "tool.clamp.KeyboardHandlerMixin",
+    "tool.clamp.LocalPlayerMixin",
+    "tool.clamp.ServerPlayerMixin",
 
     "server.PlayerChunkSenderMixin",
 

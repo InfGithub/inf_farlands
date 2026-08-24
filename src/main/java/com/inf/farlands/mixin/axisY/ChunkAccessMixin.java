@@ -121,7 +121,7 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
     }
 
     private int _sectIdx(int y) {
-        return this.levelHeightAccessor.getSectionIndex(y);
+        return windowSectionIndexFromY(y >> 4);
     }
 
     // ---------------- disable replaceMissingSections ----------------
@@ -306,7 +306,7 @@ public abstract class ChunkAccessMixin implements WindowedChunk {
                             + QuartPos.fromBlock(this.levelHeightAccessor.getHeight()) - 1)));
             LevelChunkSection s = this.getSection(j);
             Holder<Biome> result;
-            if (s != null) {
+if (s != null) {
                 result = s.getNoiseBiome(x & 3, y & 3, z & 3);
             } else {
                 result = this.biomeRegistry != null

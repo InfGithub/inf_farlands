@@ -150,7 +150,12 @@ public abstract class Aquifer$NoiseBasedAquiferMixin {
 
                     if (cache != Long.MAX_VALUE) {
                         longPos = cache;
-                        IntBlockPos c = IntBlockPos.getBlockPos(longPos);
+                        IntBlockPos c = HashUtil.getAquiferBlock(longPos);
+                        // 专用持久表（lastAccess 保活，生成期不 miss）；miss 罕见，
+                        // fallback 位解码只读不写回——不污染专用/通用表。
+                        if (c == null) {
+                            c = IntBlockPos.getBlockPos(longPos);
+                        }
                         lx = c.x;
                         ly = c.y;
                         lz = c.z;
@@ -160,6 +165,7 @@ public abstract class Aquifer$NoiseBasedAquiferMixin {
                         ly = gridY * 12 + r.nextInt(9);
                         lz = gridZ * 16 + r.nextInt(10);
                         longPos = BlockPos.asLong(lx, ly, lz);
+                        HashUtil.putAquiferBlock(longPos, new IntBlockPos(lx, ly, lz));
                         this.aquiferLocationCache[index] = longPos;
                     }
 
@@ -201,9 +207,9 @@ public abstract class Aquifer$NoiseBasedAquiferMixin {
         int max2 = nearestDist[1];
         int max3 = nearestDist[2];
 
-        HashUtil.putBlock(i2, new IntBlockPos(j2x, j2y, j2z));
-        HashUtil.putBlock(j2, new IntBlockPos(k2x, k2y, k2z));
-        HashUtil.putBlock(k2, new IntBlockPos(l2x, l2y, l2z));
+        HashUtil.putAquiferBlock(i2, new IntBlockPos(j2x, j2y, j2z));
+        HashUtil.putAquiferBlock(j2, new IntBlockPos(k2x, k2y, k2z));
+        HashUtil.putAquiferBlock(k2, new IntBlockPos(l2x, l2y, l2z));
 
         Aquifer.FluidStatus fluidStatus1 = getAquiferStatus(i2);
         BlockState blockState = fluidStatus1.at(j);

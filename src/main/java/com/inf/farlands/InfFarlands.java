@@ -4,6 +4,9 @@ import com.inf.farlands.network.FarLandsChunkDataPacket;
 import com.inf.farlands.network.FarLandsLightUpdatePacket;
 import com.inf.farlands.network.FarLandsSectionBlocksUpdatePacket;
 import com.inf.farlands.terrain.BetaTerrain;
+import com.inf.farlands.tool.clamp.ClampMode;
+import com.inf.farlands.tool.clamp.FarLandsClampStatePacket;
+import com.inf.farlands.tool.clamp.FarLandsClampTogglePacket;
 
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
@@ -26,6 +29,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -315,6 +319,36 @@ public class InfFarlands {
     @SuppressWarnings("null")
     private void registerPayloads(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
+        // 钳制模式 toggle：F3+K（客户端）→ 服务端校验 OP → toggle per-player 状态
+        registrar.playToServer(
+                FarLandsClampTogglePacket.TYPE,
+                FarLandsClampTogglePacket.STREAM_CODEC,
+                (payload, context) -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        if (player.hasPermissions(2)) {
+                            ClampMode clamp = (ClampMode) player;
+                            boolean enabled = !clamp.farlandsIsClampEnabled();
+                            clamp.farlandsSetClampEnabled(enabled);
+                            player.displayClientMessage(Component.translatable(
+                                    enabled ? "commands.inf_farlands.clamp.on" : "commands.inf_farlands.clamp.off"), false);
+                            // 状态同步到客户端（客户端钳制预测位置，阻止预测覆盖服务端钳制）
+                            player.connection.send(new ClientboundCustomPayloadPacket(new FarLandsClampStatePacket(enabled)));
+                        } else {
+                            player.displayClientMessage(
+                                    Component.translatable("commands.inf_farlands.clamp.no_permission"), false);
+                        }
+                    }
+                });
+
+        registrar.playToClient(
+                FarLandsClampStatePacket.TYPE,
+                FarLandsClampStatePacket.STREAM_CODEC,
+                (payload, context) -> {
+                    if (Minecraft.getInstance().player instanceof ClampMode clamp) {
+                        clamp.farlandsSetClampEnabled(payload.enabled());
+                    }
+                });
+
         registrar.playToClient(
                 FarLandsSectionBlocksUpdatePacket.TYPE,
                 FarLandsSectionBlocksUpdatePacket.STREAM_CODEC,

@@ -5,12 +5,14 @@ import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -36,7 +38,10 @@ public class FarLandsCommands {
                         .then(Commands.literal("section")
                                 .then(Commands.literal("light")
                                         .then(Commands.literal("dump")
-                                                .executes(ctx -> dump(ctx.getSource()))))));
+                                                .executes(ctx -> dump(ctx.getSource()))))
+                                .then(Commands.literal("biome")
+                                        .then(Commands.literal("dump")
+                                                .executes(ctx -> dumpBiomeCmd(ctx.getSource()))))));
     }
 
     @SuppressWarnings("null")
@@ -58,6 +63,54 @@ public class FarLandsCommands {
             InfFarlands.LOGGER.error("FLDUMP server err", e);
         }
         return 1;
+    }
+
+    @SuppressWarnings("null")
+    private static int dumpBiomeCmd(CommandSourceStack source) {
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            ServerLevel level = player.serverLevel();
+            BlockPos pos = player.blockPosition();
+            SectionPos sec = SectionPos.of(pos);
+            InfFarlands.LOGGER.info("BIODUMP server pos={},{},{} sec={},{},{}",
+                    pos.getX(), pos.getY(), pos.getZ(), sec.x(), sec.y(), sec.z());
+            dumpBiomes(level, sec);
+            source.sendSuccess(() -> Component.translatable("commands.inf_farlands.section.biome.dump"), false);
+        } catch (Exception e) {
+            InfFarlands.LOGGER.error("BIODUMP server err", e);
+        }
+        return 1;
+    }
+
+    /** 当前 section 的 4x4x4 biome 网格（服务端/客户端共用）。 */
+    @SuppressWarnings("null")
+    public static void dumpBiomes(Level level, SectionPos sec) {
+        try {
+            ChunkAccess ca = level.getChunk(sec.x(), sec.z(), ChunkStatus.FULL, false);
+            if (!(ca instanceof LevelChunk lc)) {
+                InfFarlands.LOGGER.info("BIODUMP secY={} chunk null", sec.y());
+                return;
+            }
+            LevelChunkSection s = ((WindowedChunk) lc).windowedAllSections().get(sec.y());
+            if (s == null) {
+                InfFarlands.LOGGER.info("BIODUMP secY={} section null", sec.y());
+                return;
+            }
+            for (int y = 0; y < 4; y++) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("BIODUMP secY=").append(sec.y()).append(" y=").append(y);
+                for (int z = 0; z < 4; z++) {
+                    sb.append("\nBIODUMP   z=").append(z).append(' ');
+                    for (int x = 0; x < 4; x++) {
+                        Holder<Biome> b = s.getBiomes().get(x, y, z);
+                        sb.append(b.unwrapKey().map(k -> k.location().getPath()).orElse("?")).append(' ');
+                    }
+                }
+                InfFarlands.LOGGER.info("{}", sb);
+            }
+        } catch (Exception e) {
+            InfFarlands.LOGGER.error("BIODUMP err", e);
+        }
     }
 
     @SuppressWarnings("null")

@@ -83,10 +83,10 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         return dl;
     }
 
-    private DataLayer localGetOrCreate(long sec) {
+    private DataLayer localGetOrCreate(long sec, long chunkKey) {
         DataLayer dl = taskLocal.get(sec);
         if (dl == null) {
-            dl = storage.getOrCreate(sec);
+            dl = storage.getOrCreate(sec, chunkKey);
             taskLocal.put(sec, dl);
         }
         return dl;
@@ -156,8 +156,8 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         return storage.get(sectionKey);
     }
 
-    public DataLayer getOrCreate(long sectionKey) {
-        DataLayer dl = storage.getOrCreate(sectionKey);
+    public DataLayer getOrCreate(long sectionKey, long chunkKey) {
+        DataLayer dl = storage.getOrCreate(sectionKey, chunkKey);
         IntSectionPos sp = IntSectionPos.getSectionPos(sectionKey);
         int subRegion = sp.y >> 4;
         int topSY = subRegion * 16 + 15;
@@ -182,19 +182,15 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
 
     /** 服务端 chunk 卸载清理：side-channel 反查移除该 chunk 全部光照层（storage 不再随卸载增长）。 */
     public void removeChunk(ChunkPos pos) {
-        int cx = pos.x, cz = pos.z;
-        storage.removeIf(key -> {
-            IntSectionPos sp = HashUtil.getSection(key);
-            return sp != null && sp.x == cx && sp.z == cz;
-        });
+        storage.removeChunk(ChunkPos.asLong(pos.x, pos.z));
         // topSections 故意不清：stale 偏高 → O1 快速失败不触发（安全）。
         // ConcurrentHashMap：initializeLight（commonPool 异步）与主线程（setDataLayer/
         // updateSectionStatus）并发写安全（原 Long2IntOpenHashMap 并发写 → rehash 损坏
         // → AIOOBE CTD，2026-08-23 实崩）。
     }
 
-    public void setDataLayer(long sectionKey, DataLayer layer) {
-        storage.put(sectionKey, layer);
+    public void setDataLayer(long sectionKey, DataLayer layer, long chunkKey) {
+        storage.put(sectionKey, layer, chunkKey);
         updateTopSection(IntSectionPos.getSectionPos(sectionKey));
     }
 
@@ -342,7 +338,7 @@ taskLocal.clear(); // 批次入口
     private void setStoredLevel(long packedPos, int level) {
         IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
         long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
-        DataLayer dl = localGetOrCreate(sec);
+        DataLayer dl = localGetOrCreate(sec, ChunkPos.asLong(bp.x >> 4, bp.z >> 4));
         dl.set(bp.x & 15, bp.y & 15, bp.z & 15, level);
         markAffected(packedPos);
     }
@@ -390,7 +386,7 @@ taskLocal.clear(); // 批次入口
             }
 
             if (ndl == null) {
-                ndl = localGetOrCreate(nSec);
+                ndl = localGetOrCreate(nSec, ChunkPos.asLong(nbpX >> 4, nbpZ >> 4));
             }
             ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, afterOpacity);
             markAffected(nPos);
@@ -509,7 +505,7 @@ taskLocal.clear(); // 批次入口
 
         for (int sy = startSY; sy >= endSY; sy--) {
             long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
-            DataLayer dl = localGetOrCreate(secKey);
+            DataLayer dl = localGetOrCreate(secKey, ChunkPos.asLong(x >> 4, z >> 4));
             int blockY = sy << 4;
             for (int ry = 15; ry >= 0; ry--) {
                 long bPos = HashUtil.hashPos((long) x, (long) (blockY + ry), (long) z);
@@ -635,10 +631,12 @@ taskLocal.clear(); // 批次入口
 
     @Override
     public void updateSectionStatus(SectionPos pos, boolean isEmpty) {
+        long chunkKey = ChunkPos.asLong(pos.x(), pos.z());
         if (isEmpty) {
-            storage.remove(pos.asLong());
+            // 不删层：同 BlockLightEngine——checkNode 的 decrease 传播需要层在，
+            // 立即删层会导致相邻 section 光残留。空层随 chunk 卸载（removeChunk）清理。
         } else {
-            getOrCreate(pos.asLong());
+            getOrCreate(pos.asLong(), chunkKey);
         }
     }
 
@@ -671,7 +669,7 @@ taskLocal.clear(); // 批次入口
 
         for (int sy = topSY - 1; sy >= Math.max(bottomSY, startSY); sy--) {
             long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
-            DataLayer dl = storage.getOrCreate(secKey);
+            DataLayer dl = storage.getOrCreate(secKey, ChunkPos.asLong(cx, cz));
             if (dl.isEmpty()) {
                 dl.fill(15);
             }
@@ -695,7 +693,11 @@ taskLocal.clear(); // 批次入口
                 int subRegion = sy >> 4;
                 int topSY = subRegion * 16 + 15;
                 if (sy == topSY) {
-                    getOrCreate(HashUtil.hashSection((long) cx, (long) sy, (long) cz));
+                    long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
+                    // 注册 side-channel：getOrCreate 区顶逻辑内部反查 sp 依赖此条目，
+                    // 否则 fallback 位解码垃圾坐标 → 区顶 fill 15 判断错误。
+                    HashUtil.putSection(secKey, new IntSectionPos(cx, sy, cz));
+                    getOrCreate(secKey, ChunkPos.asLong(cx, cz));
                 }
             }
         }
@@ -717,7 +719,7 @@ taskLocal.clear(); // 批次入口
                 // vanilla 语义：getDataLayerToWrite 创建层（传播初始化必须建层，
                 // 否则地表空层被跳过 → 最低光源处永不 enqueue → 传播无源 → 全黑）。
                 // 空层（全 0）留在 storage 也无害：该位置本就被遮挡（该黑）。
-                DataLayer dl = storage.getOrCreate(secKey);
+                DataLayer dl = storage.getOrCreate(secKey, ChunkPos.asLong(cx, cz));
                 affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 每 section 一次（渲染刷新粒度）
 
                 int baseY = sy << 4;

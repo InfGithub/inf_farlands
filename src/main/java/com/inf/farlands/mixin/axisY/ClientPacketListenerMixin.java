@@ -27,6 +27,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.protocol.PacketUtils;
 
 /**
@@ -40,7 +41,7 @@ import net.minecraft.network.protocol.PacketUtils;
 public abstract class ClientPacketListenerMixin {
 
     @Shadow
-    private net.minecraft.client.multiplayer.ClientLevel level;
+    private ClientLevel level;
 
     /**
      * 修复：标记实际有数据的 section（allSections），而非窗口数组。窗口是
@@ -88,7 +89,7 @@ public abstract class ClientPacketListenerMixin {
     @SuppressWarnings("null")
     @Overwrite
     public void handleForgetLevelChunk(ClientboundForgetLevelChunkPacket packet) {
-        net.minecraft.network.protocol.PacketUtils.ensureRunningOnSameThread(packet,
+        PacketUtils.ensureRunningOnSameThread(packet,
                 (ClientPacketListener) (Object) this, Minecraft.getInstance());
         ChunkPos cpos = packet.pos();
 

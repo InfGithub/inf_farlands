@@ -30,7 +30,29 @@ public class ClientFarLandsCommands {
                                 .then(Commands.literal("section")
                                         .then(Commands.literal("light")
                                                 .then(Commands.literal("dump")
-                                                        .executes(ctx -> dumpClient(ctx.getSource())))))));
+                                                        .executes(ctx -> dumpClient(ctx.getSource()))))
+                                        .then(Commands.literal("biome")
+                                                .then(Commands.literal("dump")
+                                                        .executes(ctx -> dumpBiomeClient(ctx.getSource())))))));
+    }
+
+    @SuppressWarnings("null")
+    private static int dumpBiomeClient(CommandSourceStack source) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null || mc.player == null) {
+                return 1;
+            }
+            BlockPos pos = mc.player.blockPosition();
+            SectionPos sec = SectionPos.of(pos);
+            InfFarlands.LOGGER.info("BIODUMP client pos={},{},{} sec={},{},{}",
+                    pos.getX(), pos.getY(), pos.getZ(), sec.x(), sec.y(), sec.z());
+            FarLandsCommands.dumpBiomes(mc.level, sec);
+            source.sendSuccess(() -> Component.translatable("commands.inf_farlands.client.section.biome.dump"), false);
+        } catch (Exception e) {
+            InfFarlands.LOGGER.error("BIODUMP client err", e);
+        }
+        return 1;
     }
 
     @SuppressWarnings("null")

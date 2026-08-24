@@ -6,6 +6,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -19,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class ClientPacketListenerMixin {
 
     @Shadow
-    private net.minecraft.client.multiplayer.ClientLevel level;
+    private ClientLevel level;
 
     // §7.5：BlockUpdate 包接收校验——XZ 超界（现状）或 sectionY ∉ 客户端视图窗口
     // （新增）→ 拒绝。窗口外数据写入后会被 §7.3 丢弃，源头拒绝更干净。

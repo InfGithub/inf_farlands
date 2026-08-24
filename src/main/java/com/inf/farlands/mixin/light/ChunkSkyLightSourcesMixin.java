@@ -11,6 +11,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.lighting.ChunkSkyLightSources;
 
@@ -112,7 +113,7 @@ public class ChunkSkyLightSourcesMixin {
      * lowestY → 破坏格被当天空光源 ADD 15 → 自然衰减传播（任何 y 火把样）。
      */
     @Overwrite
-    public void fillFrom(net.minecraft.world.level.chunk.ChunkAccess chunk) {
+    public void fillFrom(ChunkAccess chunk) {
         if (!(chunk instanceof WindowedChunk wc)) {
             this.fill(this.minY);
             return;
@@ -146,7 +147,7 @@ public class ChunkSkyLightSourcesMixin {
     /** 复刻 vanilla findLowestSourceY，但用 allSections（绝对 section Y）逐格向下找遮挡。 */
     @Unique
     @SuppressWarnings("null")
-    private int findLowestSourceYAll(net.minecraft.world.level.chunk.ChunkAccess chunk,
+    private int findLowestSourceYAll(ChunkAccess chunk,
             Map<Integer, LevelChunkSection> all, int highestSection, int lowestSection, int x, int z) {
         this.mutablePos1.set(x, highestSection * 16 + 16, z);
         this.mutablePos2.set(x, highestSection * 16 + 15, z);

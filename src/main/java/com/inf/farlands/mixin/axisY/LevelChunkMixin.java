@@ -38,15 +38,12 @@ public abstract class LevelChunkMixin {
 
     private static final Field F_ALL_SECTIONS;
     private static final Field F_BIOME_REGISTRY;
-    private static final Field F_LHA;
     static {
         try {
             F_ALL_SECTIONS = ChunkAccess.class.getDeclaredField("allSections");
             F_ALL_SECTIONS.setAccessible(true);
             F_BIOME_REGISTRY = ChunkAccess.class.getDeclaredField("biomeRegistry");
             F_BIOME_REGISTRY.setAccessible(true);
-            F_LHA = ChunkAccess.class.getDeclaredField("levelHeightAccessor");
-            F_LHA.setAccessible(true);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -150,11 +147,10 @@ public abstract class LevelChunkMixin {
     @Overwrite
     public void replaceBiomes(FriendlyByteBuf buffer) {
         ChunkAccess ca = (ChunkAccess) (Object) this;
-        LevelHeightAccessor lha = getLevelHeightAccessor(ca);
         int sectionCount = buffer.readVarInt();
         for (int i = 0; i < sectionCount; i++) {
             int sectionY = buffer.readVarInt();
-            LevelChunkSection s = ca.getSection(lha.getSectionIndexFromSectionY(sectionY));
+            LevelChunkSection s = ca.getSection(ca.getSectionIndexFromSectionY(sectionY));
             if (s != null) {
                 s.readBiomes(buffer);
             }
@@ -165,14 +161,6 @@ public abstract class LevelChunkMixin {
     private static Registry<Biome> getBiomeRegistry(ChunkAccess ca) {
         try {
             return (Registry<Biome>) F_BIOME_REGISTRY.get(ca);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static LevelHeightAccessor getLevelHeightAccessor(ChunkAccess ca) {
-        try {
-            return (LevelHeightAccessor) F_LHA.get(ca);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

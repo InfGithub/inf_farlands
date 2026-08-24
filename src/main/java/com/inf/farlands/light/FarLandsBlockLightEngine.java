@@ -67,10 +67,10 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
         return dl;
     }
 
-    private DataLayer localGetOrCreate(long sec) {
+    private DataLayer localGetOrCreate(long sec, long chunkKey) {
         DataLayer dl = taskLocal.get(sec);
         if (dl == null) {
-            dl = storage.getOrCreate(sec);
+            dl = storage.getOrCreate(sec, chunkKey);
             taskLocal.put(sec, dl);
         }
         return dl;
@@ -111,12 +111,12 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
         return storage.get(sectionKey);
     }
 
-    public DataLayer getOrCreate(long sectionKey) {
-        return storage.getOrCreate(sectionKey);
+    public DataLayer getOrCreate(long sectionKey, long chunkKey) {
+        return storage.getOrCreate(sectionKey, chunkKey);
     }
 
-    public void setDataLayer(long sectionKey, DataLayer layer) {
-        storage.put(sectionKey, layer);
+    public void setDataLayer(long sectionKey, DataLayer layer, long chunkKey) {
+        storage.put(sectionKey, layer, chunkKey);
     }
 
     // ==================== 服务端 per-chunk 任务入口 ====================
@@ -154,13 +154,9 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
         notifyLightChanges();
     }
 
-    /** 服务端 chunk 卸载清理：side-channel 反查移除该 chunk 全部光照层（storage 不再随卸载增长）。 */
+    /** 服务端 chunk 卸载清理：按索引移除该 chunk 全部光照层（O(sections/chunk)）。 */
     public void removeChunk(ChunkPos pos) {
-        int cx = pos.x, cz = pos.z;
-        storage.removeIf(key -> {
-            IntSectionPos sp = HashUtil.getSection(key);
-            return sp != null && sp.x == cx && sp.z == cz;
-        });
+        storage.removeChunk(ChunkPos.asLong(pos.x, pos.z));
     }
 
     // ==================== runLightUpdates ====================
@@ -263,7 +259,7 @@ taskLocal.clear(); // 批次入口
     private void setStoredLevel(long packedPos, int level) {
         IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
         long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
-        DataLayer dl = localGetOrCreate(sec);
+        DataLayer dl = localGetOrCreate(sec, ChunkPos.asLong(bp.x >> 4, bp.z >> 4));
         dl.set(bp.x & 15, bp.y & 15, bp.z & 15, level);
         markAffected(packedPos);
     }
@@ -330,7 +326,7 @@ taskLocal.clear(); // 批次入口
             }
 
             if (ndl == null) {
-                ndl = localGetOrCreate(nSec);
+                ndl = localGetOrCreate(nSec, ChunkPos.asLong(nbpX >> 4, nbpZ >> 4));
             }
             ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, afterOpacity);
             markAffected(nPos);
@@ -412,10 +408,13 @@ taskLocal.clear(); // 批次入口
 
     @Override
     public void updateSectionStatus(SectionPos pos, boolean isEmpty) {
+        long chunkKey = ChunkPos.asLong(pos.x(), pos.z());
         if (isEmpty) {
-            storage.remove(pos.asLong());
+            // 不删层：层保留到 chunk 卸载（removeChunk 清理）。立即删层会让
+            // checkNode 的 localContains 早退 → decrease 不传播 → 相邻 section
+            // 光残留（打掉方块 section 变空场景，跨任务时序无法保证 checkNode 先于删层）。
         } else {
-            storage.getOrCreate(pos.asLong());
+            storage.getOrCreate(pos.asLong(), chunkKey);
         }
     }
 

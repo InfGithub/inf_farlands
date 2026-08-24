@@ -17,6 +17,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongAVLTreeSet;
@@ -46,7 +47,7 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
     }
 
     @Shadow
-    private it.unimi.dsi.fastutil.longs.Long2ObjectFunction<Visibility> intialSectionVisibility;
+    private Long2ObjectFunction<Visibility> intialSectionVisibility;
 
     @Shadow
     private Class<? extends T> entityClass;
