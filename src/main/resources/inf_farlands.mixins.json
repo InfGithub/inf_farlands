@@ -67,8 +67,11 @@
     "render.SectionOcclusionGraphMixin",
     "render.ViewAreaMixin",
 
+    "tool.clamp.BlockPlaceContextMixin",
     "tool.clamp.EntityCollisionMixin",
+    "tool.clamp.EntityPickMixin",
     "tool.clamp.KeyboardHandlerMixin",
+    "tool.clamp.LevelRendererMixin",
     "tool.clamp.LocalPlayerMixin",
     "tool.clamp.ServerPlayerMixin",
 
