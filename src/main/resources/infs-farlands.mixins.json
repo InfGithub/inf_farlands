@@ -2,7 +2,14 @@
   "required": true,
   "package": "com.inf.farlands.mixin",
   "compatibilityLevel": "JAVA_25",
-  "mixins": [],
+  "mixins": [
+    "expand/xz/DedicatedServerPropertiesMixin",
+    "expand/xz/ForceLoadCommandMixin",
+    "expand/xz/LevelMixin",
+    "expand/xz/LevelReaderMixin",
+    "expand/xz/MinecraftServerMixin",
+    "expand/xz/WorldBorderMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },

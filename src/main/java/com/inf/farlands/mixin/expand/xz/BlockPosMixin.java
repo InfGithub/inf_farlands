@@ -6,12 +6,16 @@ import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-
-import com.inf.farlands.FarlandsConstant;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
 
+/**
+ * 本 mixin 的实现方式存在严重问题，
+ * 这会导致所有使用 BlockPos.asLong 的地方 CTD，
+ * 且后续本 mixin 可能会被 IntBlockPos 取代。
+ * 目前，本 mixin 已从 mixins.json 中移除。
+ */
 @Mixin(BlockPos.class)
 public class BlockPosMixin {
     @Shadow
@@ -23,11 +27,11 @@ public class BlockPosMixin {
         PACKED_HORIZONTAL_LENGTH = value;
     }
 
-    private static final int exceptPackedHorizontalLength = 1 + Mth.log2(
-            Mth.smallestEncompassingPowerOfTwo(FarlandsConstant.MAX_BLOCK));
+    // java 无法存储 -2147483648
+    private static final int exceptPackedHorizontalLength = 32;
 
     @Inject(method = "<clinit>", at = @At("RETURN"))
-    private static void OnClassInit() {
+    private static void OnClassInit(CallbackInfo ci) {
         setPackedHorizontalLength(exceptPackedHorizontalLength);
     }
 }
