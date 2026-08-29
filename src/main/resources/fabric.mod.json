@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "infs-farlands",
+  "version": "${version}",
+  "name": "Inf's Farlands",
+  "description": "Wait, that's the farlands!",
+  "authors": [
+    {
+      "name": "Infinitive",
+      "contact": {
+        "github": "https://github.com/InfGithub"
+      }
+    }
+  ],
+  "license": "MIT",
+  "icon": "assets/infs-farlands/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.inf.farlands.InfSFarlands"],
+    "client": ["com.inf.farlands.client.InfSFarlandsClient"]
+  },
+  "mixins": [
+    "infs-farlands.mixins.json",
+    {
+      "config": "infs-farlands.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.1.2",
+    "java": ">=25"
+  }
+}

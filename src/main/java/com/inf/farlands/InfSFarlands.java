@@ -1,0 +1,25 @@
+package com.inf.farlands;
+
+import net.fabricmc.api.ModInitializer;
+
+import net.minecraft.resources.Identifier;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class InfSFarlands implements ModInitializer {
+	public static final String MOD_ID = "infs-farlands";
+
+	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+	@Override
+	public void onInitialize() {
+		// * Minecraft: Stroy Mode
+		LOGGER.info("Nothing built can last forever, and every legend, no matter how great, fades with time.");
+
+	}
+
+	public static Identifier id(String path) {
+		return Identifier.fromNamespaceAndPath(MOD_ID, path);
+	}
+}
