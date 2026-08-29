@@ -40,5 +40,5 @@ replay_*.log
 *.jfr
 
 # 自定义
-sourcecode
+source
 docs
