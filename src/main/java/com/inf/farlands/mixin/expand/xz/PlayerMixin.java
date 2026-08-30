@@ -15,7 +15,7 @@ public class PlayerMixin {
         return FarlandsConstant.MAX_BLOCK - 1;
     }
 
-    @ModifyConstant(method = "tick", constant = @Constant(doubleValue = 2.9999999E7))
+    @ModifyConstant(method = "tick", constant = @Constant(doubleValue = -2.9999999E7))
     private static double minPos(double value) {
         return ~FarlandsConstant.MAX_BLOCK + 1;
     }

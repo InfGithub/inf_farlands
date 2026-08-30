@@ -42,3 +42,4 @@ replay_*.log
 # 自定义
 source
 docs
+*.log

@@ -4,11 +4,15 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "expand/xz/DedicatedServerPropertiesMixin",
+    "expand/xz/DimensionTypeMixin",
+    "expand/xz/EntityMixin",
     "expand/xz/ForceLoadCommandMixin",
     "expand/xz/LegacyWorldBorderFixMixin",
     "expand/xz/LevelMixin",
     "expand/xz/LevelReaderMixin",
     "expand/xz/MinecraftServerMixin",
+    "expand/xz/PlayerMixin",
+    "expand/xz/ServerGamePacketListenerImplMixin",
     "expand/xz/WorldBorder$SettingsMixin",
     "expand/xz/WorldBorderCommandMixin",
     "expand/xz/WorldBorderMixin"
