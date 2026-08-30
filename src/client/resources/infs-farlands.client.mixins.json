@@ -2,7 +2,16 @@
   "required": true,
   "package": "com.inf.farlands.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["renderer/debug/ChunkBorderRendererMixin"],
+  "client": [
+    "debug/renderer/ChunkBorderRendererMixin",
+
+    "debug/tool/clamp/EntityPickMixin",
+    "debug/tool/clamp/KeyboardHandlerMixin",
+    "debug/tool/clamp/LevelRendererMixin",
+    "debug/tool/clamp/LocalPlayerMixin",
+
+    "network/ClientboundCustomPayloadPacketMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },

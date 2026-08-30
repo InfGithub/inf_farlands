@@ -1,4 +1,4 @@
-package com.inf.farlands.client.mixin.renderer.debug;
+package com.inf.farlands.client.mixin.debug.renderer;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -95,6 +95,11 @@ public class ChunkBorderRendererMixin {
         }
     }
 
+    private static final int RED = 0xFFFF0000;
+    private static final int YELLOW = 0xFFFFFF00;
+    private static final int BLUE = 0xFF0000FF;
+    private static final int WHITE = 0xFFFFFFF;
+
     @Inject(method = "emitGizmos", at = @At("HEAD"), cancellable = true)
     private void emitGizmos(
             final double camX,
@@ -124,7 +129,7 @@ public class ChunkBorderRendererMixin {
                     Gizmos.line(
                             new Vec3(x, y, z),
                             new Vec3(x + 16.0, y, z),
-                            0xFF0000FF,
+                            BLUE,
                             2.0F);
                 }
             }
@@ -142,7 +147,7 @@ public class ChunkBorderRendererMixin {
                     Gizmos.line(
                             new Vec3(x, y, z),
                             new Vec3(x, y + 16.0, z),
-                            0xFF0000FF,
+                            BLUE,
                             2.0F);
                 }
             }
@@ -160,7 +165,7 @@ public class ChunkBorderRendererMixin {
                     Gizmos.line(
                             new Vec3(x, y, z),
                             new Vec3(x, y, z + 16.0),
-                            0xFF0000FF,
+                            BLUE,
                             2.0F);
                 }
             }
@@ -168,8 +173,8 @@ public class ChunkBorderRendererMixin {
 
         // 红线
         for (int axis = 0; axis < 3; axis++) {
-            drawFaceGrid(xstart, ystart, zstart, axis, false, 2, 0xFFFF0000, 2.5F);
-            drawFaceGrid(xstart, ystart, zstart, axis, true, 2, 0xFFFF0000, 2.5F);
+            drawFaceGrid(xstart, ystart, zstart, axis, false, 2, RED, 2.5F);
+            drawFaceGrid(xstart, ystart, zstart, axis, true, 2, RED, 2.5F);
         }
 
         // 黄线
@@ -180,8 +185,8 @@ public class ChunkBorderRendererMixin {
             double oz = zstart + off[2] * 16.0;
 
             for (int axis = 0; axis < 3; axis++) {
-                drawFaceGrid(ox, oy, oz, axis, false, step, 0xFFFFFF00, 1.5F);
-                drawFaceGrid(ox, oy, oz, axis, true, step, 0xFFFFFF00, 1.5F);
+                drawFaceGrid(ox, oy, oz, axis, false, step, YELLOW, 1.5F);
+                drawFaceGrid(ox, oy, oz, axis, true, step, YELLOW, 1.5F);
             }
         }
         // 白线，1x1x1 sec
@@ -198,7 +203,7 @@ public class ChunkBorderRendererMixin {
                             xstart + vertices[v2][0] * 16.0,
                             ystart + vertices[v2][1] * 16.0,
                             zstart + vertices[v2][2] * 16.0),
-                    0xFFFFFFFF,
+                    WHITE,
                     3.0F);
         }
         ci.cancel();
