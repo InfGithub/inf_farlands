@@ -14,7 +14,7 @@ public class InfSFarlands implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		// * Minecraft: Stroy Mode
+		// * Minecraft: Story Mode
 		LOGGER.info("Nothing built can last forever, and every legend, no matter how great, fades with time.");
 
 	}
