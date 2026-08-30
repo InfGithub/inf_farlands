@@ -9,11 +9,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload.TypeAndCodec;
 
 public class ClampStatePacketRegister {
-    public static void register() {
+    public static void registerType() {
         Clientbounds.register(new TypeAndCodec<>(
                 ClampStatePacket.TYPE,
                 ClampStatePacket.STREAM_CODEC));
+    }
 
+    public static void registerHanlder() {
         ClientPacketHandlers.register(
                 ClampStatePacket.TYPE,
                 (payload, context) -> {

@@ -4,6 +4,11 @@ import net.fabricmc.api.ClientModInitializer;
 import com.inf.farlands.client.register.FarlandsRegister;
 
 public class InfSFarlandsClient implements ClientModInitializer {
+
+	static {
+		FarlandsRegister.registerStatic();
+	}
+
 	@Override
 	public void onInitializeClient() {
 		FarlandsRegister.register();

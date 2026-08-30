@@ -13,6 +13,10 @@ public class InfSFarlands implements ModInitializer {
 
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
+	static{
+		FarlandsRegister.registerStatic();
+	}
+
 	@Override
 	public void onInitialize() {
 		// * Minecraft: Story Mode

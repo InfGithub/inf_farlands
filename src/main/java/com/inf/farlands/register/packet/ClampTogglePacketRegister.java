@@ -13,11 +13,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
 
 public class ClampTogglePacketRegister {
-    public static void register() {
+    public static void registerType() {
         Serverbounds.register(new TypeAndCodec<>(
                 ClampTogglePacket.TYPE,
                 ClampTogglePacket.STREAM_CODEC));
+    }
 
+    public static void registerHanlder() {
         ServerPacketHandlers.register(ClampTogglePacket.TYPE, (payload,
                 context) -> {
             ServerPlayer player = context.player;

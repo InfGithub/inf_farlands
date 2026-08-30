@@ -21,6 +21,7 @@
     "expand/xz/WorldBorderCommandMixin",
     "expand/xz/WorldBorderMixin",
 
+    "network/ClientboundCustomPayloadPacketMixin",
     "network/ServerboundCustomPayloadPacketMixin",
 
     "tick/MinecraftServerMixin"
