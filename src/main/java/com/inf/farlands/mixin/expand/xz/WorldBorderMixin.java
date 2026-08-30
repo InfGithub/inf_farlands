@@ -29,6 +29,6 @@ public class WorldBorderMixin {
 
     @ModifyConstant(method = "<init>(Lnet/minecraft/world/level/border/WorldBorder$Settings;)V", constant = @Constant(doubleValue = 5.9999968E7D))
     private double OnInitB(double value) {
-        return (double) (FarlandsConstant.MAX_BLOCK - 16) * 2;
+        return (FarlandsConstant.MAX_BLOCK - 16.0) * 2.0;
     }
 }

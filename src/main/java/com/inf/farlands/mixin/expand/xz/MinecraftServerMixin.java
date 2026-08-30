@@ -12,7 +12,7 @@ import net.minecraft.server.MinecraftServer;
 public class MinecraftServerMixin {
 
     @ModifyConstant(method = "getAbsoluteMaxWorldSize", constant = @Constant(intValue = 29999984))
-    private int getAbsoluteMaxWorldSize(int value) {
+    private int absoluteMaxWorldSize(int value) {
         return FarlandsConstant.MAX_BLOCK;
     }
 }

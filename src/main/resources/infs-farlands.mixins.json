@@ -5,9 +5,12 @@
   "mixins": [
     "expand/xz/DedicatedServerPropertiesMixin",
     "expand/xz/ForceLoadCommandMixin",
+    "expand/xz/LegacyWorldBorderFixMixin",
     "expand/xz/LevelMixin",
     "expand/xz/LevelReaderMixin",
     "expand/xz/MinecraftServerMixin",
+    "expand/xz/WorldBorder$SettingsMixin",
+    "expand/xz/WorldBorderCommandMixin",
     "expand/xz/WorldBorderMixin"
   ],
   "injectors": {
