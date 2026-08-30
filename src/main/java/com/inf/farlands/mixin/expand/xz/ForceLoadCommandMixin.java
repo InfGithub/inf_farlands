@@ -18,6 +18,6 @@ public class ForceLoadCommandMixin {
 
     @ModifyConstant(method = "changeForceLoad", constant = @Constant(intValue = -30000000))
     private static int minBlock(int min) {
-        return -FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConstant.MAX_BLOCK;
     }
 }

@@ -20,7 +20,7 @@ public class LevelMixin {
 
     @ModifyConstant(method = "isInWorldBoundsHorizontal", constant = @Constant(intValue = -30000000))
     private static int minBlockA(int min) {
-        return -FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConstant.MAX_BLOCK;
     }
 
     @ModifyConstant(method = "getHeight", constant = @Constant(intValue = 30000000))
@@ -30,6 +30,6 @@ public class LevelMixin {
 
     @ModifyConstant(method = "getHeight", constant = @Constant(intValue = -30000000))
     private static int minBlockB(int min) {
-        return -FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConstant.MAX_BLOCK;
     }
 }

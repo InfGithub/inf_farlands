@@ -23,6 +23,6 @@ public class WorldBorder$SettingsMixin {
 
     @ModifyConstant(method = "lambda$static$0", constant = @Constant(doubleValue = -2.9999984E7))
     private static double onClassInitC(double value) {
-        return -FarlandsConstant.MAX_BLOCK + 16.0;
+        return ~FarlandsConstant.MAX_BLOCK + 16.0;
     }
 }

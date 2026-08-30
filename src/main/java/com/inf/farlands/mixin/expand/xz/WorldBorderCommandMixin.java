@@ -27,7 +27,7 @@ public class WorldBorderCommandMixin {
 
     @ModifyConstant(method = "register", constant = @Constant(doubleValue = -5.9999968E7d))
     private static double minBlock(double value) {
-        return (FarlandsConstant.MAX_BLOCK - 16.0) * -2.0;
+        return (~FarlandsConstant.MAX_BLOCK + 16.0) * 2.0;
     }
 
     @ModifyConstant(method = "setSize", constant = @Constant(doubleValue = 5.9999968E7d))

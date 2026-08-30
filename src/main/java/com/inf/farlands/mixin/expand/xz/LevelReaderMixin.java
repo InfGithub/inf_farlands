@@ -17,6 +17,6 @@ public interface LevelReaderMixin {
 
     @ModifyConstant(method = "getMaxLocalRawBrightness(Lnet/minecraft/core/BlockPos;I)I", constant = @Constant(intValue = -30000000))
     private int minBlock(int min) {
-        return -FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConstant.MAX_BLOCK;
     }
 }
