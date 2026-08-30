@@ -2,7 +2,7 @@
   "required": true,
   "package": "com.inf.farlands.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": [],
+  "client": ["renderer/debug/ChunkBorderRendererMixin"],
   "injectors": {
     "defaultRequire": 1
   },
