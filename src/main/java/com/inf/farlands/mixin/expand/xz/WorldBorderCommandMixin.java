@@ -34,4 +34,9 @@ public class WorldBorderCommandMixin {
     private static double maxSize(double value) {
         return (FarlandsConstant.MAX_BLOCK - 16.0) * 2.0;
     }
+
+    @ModifyConstant(method = "setCenter", constant = @Constant(doubleValue = 2.9999984E7))
+    private static double maxBlockA(double value) {
+        return FarlandsConstant.MAX_BLOCK - 16.0;
+    }
 }
