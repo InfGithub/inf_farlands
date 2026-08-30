@@ -15,7 +15,9 @@
     "expand/xz/ServerGamePacketListenerImplMixin",
     "expand/xz/WorldBorder$SettingsMixin",
     "expand/xz/WorldBorderCommandMixin",
-    "expand/xz/WorldBorderMixin"
+    "expand/xz/WorldBorderMixin",
+
+    "tick/MinecraftServerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

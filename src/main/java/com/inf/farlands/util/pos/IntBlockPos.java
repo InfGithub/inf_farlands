@@ -1,0 +1,36 @@
+package com.inf.farlands.util.pos;
+
+import com.inf.farlands.util.block.BlockUtil;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+
+public class IntBlockPos {
+    public final int x, y, z;
+
+    public IntBlockPos(int x, int y, int z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    public IntBlockPos(BlockPos pos) {
+        this(pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    public IntBlockPos offset(Direction d) {
+        return new IntBlockPos(x + d.getStepX(), y + d.getStepY(), z + d.getStepZ());
+    }
+
+    public IntBlockPos offset(int dx, int dy, int dz) {
+        return new IntBlockPos(x + dx, y + dy, z + dz);
+    }
+
+    public static IntBlockPos getBlockPos(long key) {
+        IntBlockPos bp = BlockUtil.getBlock(key);
+        if (bp != null) {
+            return bp;
+        }
+        return new IntBlockPos(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
+    }
+}
