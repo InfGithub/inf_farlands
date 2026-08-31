@@ -1,10 +1,13 @@
 package com.inf.farlands.mixin.expand.xyz.pos;
 
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+
+import com.inf.farlands.FarlandsConstant;
 
 @Mixin(ChunkPos.class)
 public abstract class ChunkPosMixin {
@@ -32,5 +35,10 @@ public abstract class ChunkPosMixin {
     @Overwrite
     public int getMinBlockZ() {
         return shiftToBlockCoord(this.z);
+    }
+
+    @Overwrite
+    public static boolean isValid(int x, int z) {
+        return true;
     }
 }
