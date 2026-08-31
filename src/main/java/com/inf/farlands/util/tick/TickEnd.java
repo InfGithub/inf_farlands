@@ -16,7 +16,7 @@ public class TickEnd {
 
     private static void trimAquiferLookup(int tickCount) {
         int beforeSize = AquiferUtil.size();
-        AquiferUtil.trim(beforeSize);
+        AquiferUtil.trim(tickCount);
         int afterSize = AquiferUtil.size();
         InfSFarlands.LOGGER.info("Trimmed AquiferUtil.lookup, before: {}, after: {}", beforeSize, afterSize);
     }
