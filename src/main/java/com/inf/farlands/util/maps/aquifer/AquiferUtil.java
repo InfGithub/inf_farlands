@@ -31,6 +31,10 @@ public class AquiferUtil {
         }
     }
 
+    public static int size() {
+        return lookup.size();
+    }
+
     public static void trim(long currentTick) {
         long cutoff = currentTick - 600;
         lookup.removeIf(p -> p.lastAccess < cutoff);

@@ -11,7 +11,7 @@ public class Common {
             return;
         }
         lastConflictInfo = now;
-        InfSFarlands.LOGGER.warn("HASHCONFLICT {} key=0x{} old={},{},{} new={},{},{}",
+        InfSFarlands.LOGGER.warn("Hash Conflicted! {} key=0x{} old={},{},{} new={},{},{}",
                 kind, Long.toHexString(key), ox, oy, oz, nx, ny, nz);
     }
 }
