@@ -7,7 +7,16 @@
     "debug/tool/clamp/EntityCollisionMixin",
     "debug/tool/clamp/ServerPlayerMixin",
 
-    "expand/xyz/pos/Aquifer$NoiseBasedAquiferMixin",
+    "expand/xyz/misc/Aquifer$NoiseBasedAquiferMixin",
+
+    "expand/xyz/pos/BlockPos$MutableBlockPosMixin",
+    "expand/xyz/pos/BlockPosMixin",
+    "expand/xyz/pos/ChunkPosMixin",
+    "expand/xyz/pos/EntitySectionStorageMixin",
+    "expand/xyz/pos/FriendlyByteBufMixin",
+    "expand/xyz/pos/PersistentEntitySectionManagerMixin",
+    "expand/xyz/pos/SectionPosMixin",
+    "expand/xyz/pos/SectionStorageMixin",
 
     "expand/xz/border/DedicatedServerPropertiesMixin",
     "expand/xz/border/DimensionTypeMixin",

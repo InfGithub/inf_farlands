@@ -1,8 +1,7 @@
-package com.inf.farlands.util.maps.section;
+package com.inf.farlands.util.maps;
 
 import com.inf.farlands.util.map.Long2ObjectStripedMap;
 import com.inf.farlands.util.pos.IntSectionPos;
-import com.inf.farlands.util.maps.Common;
 
 public class SectionUtil {
     public static final Long2ObjectStripedMap<IntSectionPos> lookup = new Long2ObjectStripedMap<>(1 << 20);
@@ -26,5 +25,14 @@ public class SectionUtil {
 
     public static IntSectionPos get(long key) {
         return lookup.get(key);
+    }
+
+    public static int size() {
+        return lookup.size();
+    }
+
+    public static void trim(long currentTick) {
+        long cutoff = currentTick - 600;
+        lookup.removeIf(p -> p.lastAccess < cutoff);
     }
 }

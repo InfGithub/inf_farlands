@@ -1,6 +1,6 @@
 package com.inf.farlands.util.pos;
 
-import com.inf.farlands.util.maps.block.BlockUtil;
+import com.inf.farlands.util.maps.BlockUtil;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

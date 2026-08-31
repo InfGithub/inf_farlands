@@ -8,6 +8,7 @@
     "debug/tool/clamp/KeyboardHandlerMixin",
     "debug/tool/clamp/LevelRendererMixin",
     "debug/tool/clamp/LocalPlayerMixin",
+    "expand/xyz/pos/LightDebugRendererMixin",
     "network/ClientboundCustomPayloadPacketMixin"
   ],
   "injectors": {

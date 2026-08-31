@@ -1,8 +1,7 @@
-package com.inf.farlands.util.maps.block;
+package com.inf.farlands.util.maps;
 
 import com.inf.farlands.util.map.Long2ObjectStripedMap;
 import com.inf.farlands.util.pos.IntBlockPos;
-import com.inf.farlands.util.maps.Common;
 
 public class BlockUtil {
     private static volatile Long2ObjectStripedMap<IntBlockPos> lookup = new Long2ObjectStripedMap<>(1 << 23);

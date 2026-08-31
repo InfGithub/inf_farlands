@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.expand.xyz.pos;
+package com.inf.farlands.mixin.expand.xyz.misc;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -8,9 +8,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.world.level.levelgen.Aquifer;
 
+import com.inf.farlands.util.maps.AquiferUtil;
 import com.inf.farlands.util.pos.AquiferPos;
 import com.inf.farlands.util.pos.IntBlockPos;
-import com.inf.farlands.util.maps.aquifer.AquiferUtil;
 
 /**
  * Aquifer.NoiseBasedAquifer 3int 适配。

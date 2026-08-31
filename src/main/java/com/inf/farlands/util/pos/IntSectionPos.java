@@ -1,8 +1,9 @@
 package com.inf.farlands.util.pos;
 
 import net.minecraft.core.SectionPos;
-import com.inf.farlands.util.tick.TickEnd;
-import com.inf.farlands.util.maps.section.SectionUtil;
+
+import com.inf.farlands.FarlandsTick;
+import com.inf.farlands.util.maps.SectionUtil;
 
 public class IntSectionPos {
     public final int x, y, z;
@@ -53,7 +54,7 @@ public class IntSectionPos {
     public static IntSectionPos getSectionPos(long key) {
         IntSectionPos sp = SectionUtil.get(key);
         if (sp != null) {
-            sp.lastAccess = TickEnd.getNow();
+            sp.lastAccess = FarlandsTick.getNow();
             return sp;
         }
         return new IntSectionPos(SectionPos.x(key), SectionPos.y(key), SectionPos.z(key));
