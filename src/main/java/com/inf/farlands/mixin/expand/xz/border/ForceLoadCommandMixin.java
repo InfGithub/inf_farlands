@@ -6,18 +6,18 @@ import org.spongepowered.asm.mixin.injection.Constant;
 
 import net.minecraft.server.commands.ForceLoadCommand;
 
-import com.inf.farlands.FarlandsConstant;
+import com.inf.farlands.FarlandsConfig;
 
 @Mixin(ForceLoadCommand.class)
 public class ForceLoadCommandMixin {
 
     @ModifyConstant(method = "changeForceLoad", constant = @Constant(intValue = 30000000))
     private static int maxBlock(int max) {
-        return FarlandsConstant.MAX_BLOCK;
+        return FarlandsConfig.borderAbsoluteMax;
     }
 
     @ModifyConstant(method = "changeForceLoad", constant = @Constant(intValue = -30000000))
     private static int minBlock(int min) {
-        return ~FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConfig.borderAbsoluteMax;
     }
 }

@@ -4,7 +4,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
-import com.inf.farlands.FarlandsConstant;
+import com.inf.farlands.FarlandsConfig;
 
 import net.minecraft.world.level.Level;
 
@@ -15,21 +15,21 @@ public class LevelMixin {
 
     @ModifyConstant(method = "isInWorldBoundsHorizontal", constant = @Constant(intValue = 30000000))
     private static int maxBlockA(int max) {
-        return FarlandsConstant.MAX_BLOCK;
+        return FarlandsConfig.borderAbsoluteMax;
     }
 
     @ModifyConstant(method = "isInWorldBoundsHorizontal", constant = @Constant(intValue = -30000000))
     private static int minBlockA(int min) {
-        return ~FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConfig.borderAbsoluteMax;
     }
 
     @ModifyConstant(method = "getHeight", constant = @Constant(intValue = 30000000))
     private static int maxBlockB(int max) {
-        return FarlandsConstant.MAX_BLOCK;
+        return FarlandsConfig.borderAbsoluteMax;
     }
 
     @ModifyConstant(method = "getHeight", constant = @Constant(intValue = -30000000))
     private static int minBlockB(int min) {
-        return ~FarlandsConstant.MAX_BLOCK;
+        return ~FarlandsConfig.borderAbsoluteMax;
     }
 }

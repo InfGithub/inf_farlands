@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import com.inf.farlands.FarlandsConstant;
+import com.inf.farlands.FarlandsConfig;
 
 import net.minecraft.server.dedicated.DedicatedServerProperties;
 
@@ -26,6 +26,6 @@ public class DedicatedServerPropertiesMixin {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void OnInit(CallbackInfo ci) {
-        setMaxWorldSize(FarlandsConstant.MAX_BLOCK - 16);
+        setMaxWorldSize(FarlandsConfig.borderAbsoluteMax - 16);
     }
 }

@@ -4,7 +4,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
-import com.inf.farlands.FarlandsConstant;
+import com.inf.farlands.FarlandsConfig;
 
 import net.minecraft.world.level.dimension.DimensionType;
 
@@ -13,6 +13,6 @@ public class DimensionTypeMixin {
 
     @ModifyConstant(method = "lambda$createDirectCodec$0", constant = @Constant(doubleValue = 3.0E7))
     private static double maxValue(double value) {
-        return FarlandsConstant.MAX_BLOCK;
+        return FarlandsConfig.borderAbsoluteMax;
     }
 }

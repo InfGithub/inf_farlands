@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import com.inf.farlands.FarlandsConstant;
+import com.inf.farlands.FarlandsConfig;
 import net.minecraft.world.level.border.WorldBorder;
 
 @Mixin(WorldBorder.class)
@@ -24,11 +24,11 @@ public class WorldBorderMixin {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void OnInitA(CallbackInfo ci) {
-        setAbsoluteMaxSize(FarlandsConstant.MAX_BLOCK);
+        setAbsoluteMaxSize(FarlandsConfig.borderAbsoluteMax);
     }
 
     @ModifyConstant(method = "<init>(Lnet/minecraft/world/level/border/WorldBorder$Settings;)V", constant = @Constant(doubleValue = 5.9999968E7D))
     private double OnInitB(double value) {
-        return (FarlandsConstant.MAX_BLOCK - 16.0) * 2.0;
+        return (FarlandsConfig.borderAbsoluteMax - 16.0) * 2.0;
     }
 }
