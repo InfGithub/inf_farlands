@@ -19,7 +19,7 @@ public class ClampTogglePacketRegister {
                 ClampTogglePacket.STREAM_CODEC));
     }
 
-    public static void registerHanlder() {
+    public static void registerHandler() {
         ServerPacketHandlers.register(ClampTogglePacket.TYPE, (payload,
                 context) -> {
             ServerPlayer player = context.player;

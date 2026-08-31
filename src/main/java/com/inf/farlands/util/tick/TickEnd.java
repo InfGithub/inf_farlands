@@ -11,7 +11,7 @@ public class TickEnd {
         now = tickCount;
         if (tickCount % TRIM_INTERVAL == 0) {
             int size = BlockUtil.size();
-            InfSFarlands.LOGGER.info("Swaping blockLookup, count: {}", size);
+            InfSFarlands.LOGGER.info("Swapping blockLookup, count: {}", size);
             BlockUtil.swap();
         }
     }

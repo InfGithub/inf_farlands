@@ -8,6 +8,6 @@ public class FarlandsRegister {
     }
 
     public static void register() {
-        ClampStatePacketRegister.registerHanlder();
+        ClampStatePacketRegister.registerHandler();
     }
 }

@@ -8,7 +8,7 @@ import net.minecraft.client.Minecraft;
 
 public class ClampStatePacketRegister {
 
-    public static void registerHanlder() {
+    public static void registerHandler() {
         ClientPacketHandlers.register(
                 ClampStatePacket.TYPE,
                 (payload, context) -> {

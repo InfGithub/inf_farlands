@@ -9,6 +9,6 @@ public class FarlandsRegister {
     }
 
     public static void register() {
-        ClampTogglePacketRegister.registerHanlder();
+        ClampTogglePacketRegister.registerHandler();
     }
 }
