@@ -12,13 +12,12 @@ import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 
 /**
- * Sodium 0.8.13-beta.1 版本绑定（升级即碎）。
+ * Sodium 0.8.13-beta.1 版本绑定，升级即碎。
  *
- * 冲突 A2+C（RenderSectionManager）：
- * - A2：onSectionAdded 用 level.getSectionIndexFromSectionY（vanilla 索引
- * y+4）取 chunk 的窗口数组（34 section）→ 系统性错位。改用窗口索引。
- * - C：onChunkAdded/onChunkRemoved 遍历 level.getMinSection()..getMaxSection()
- * （固定 24 个）——与窗口（34，跟随玩家）不匹配；A2 修复后玩家 Y 远离
+ * onSectionAdded 用 level.getSectionIndexFromSectionY，vanilla 索引 y+4，取
+ * chunk 的窗口数组 34 section → 系统性错位；改用窗口索引。
+ * onChunkAdded/onChunkRemoved 遍历 level.getMinSection()..getMaxSection()
+ * 固定 24 个——与窗口 34 个，跟随玩家，不匹配；改用窗口索引后玩家 Y 远离
  * [64,208] 时遍历 level 范围会索引越界。改遍历窗口范围。
  *
  * onSectionAdded(int x, int y, int z) 参数槽：this=0, x=1, y=2, z=3。
@@ -39,7 +38,7 @@ public abstract class RenderSectionManagerMixin {
         int idx = chunk.getSectionIndexFromSectionY(y);
         int len = chunk.getSections().length;
         if (idx < 0 || idx >= len) {
-            // 兜底：onChunkAdded 遍历窗口与 chunk 窗口变化（防御）——clamp 防越界
+            // 兜底：onChunkAdded 遍历窗口与 chunk 窗口变化——clamp
             return Math.max(0, Math.min(idx, len - 1));
         }
         return idx;

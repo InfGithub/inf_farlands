@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.QuartPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -111,11 +112,11 @@ public abstract class NoiseBasedChunkGeneratorMixin {
         return doFillRange(blender, structureManager, random, chunk, minSy, maxSy);
     }
 
-    // ---- on‑demand fill — 任意 Y 窗口地形生成（预留入口；当前无调用点）----
+    // ---- on‑demand fill — 任意 Y 窗口地形生成，预留入口，当前无调用点 ----
 
     /**
      * 把地形填入 {@code [minSection, maxSection]} 范围内的 chunk section。
-     * 创建覆盖所需 block-Y 范围的临时 NoiseChunk（自定义 NoiseSettings），
+     * 创建覆盖所需 block-Y 范围的临时 NoiseChunk，采用自定义 NoiseSettings，
      * 使 beta 地形可在任意 Y 生成。
      */
     @SuppressWarnings("null")
@@ -126,8 +127,8 @@ public abstract class NoiseBasedChunkGeneratorMixin {
             NoiseSettings orig = genSettings.noiseSettings();
             int noiseH = orig.noiseSizeHorizontal();
             int noiseV = orig.noiseSizeVertical();
-            int cellW = 1 << noiseH; // 4
-            int cellH = 1 << noiseV; // 8
+            int cellW = QuartPos.toBlock(noiseH);
+            int cellH = QuartPos.toBlock(noiseV);
 
             int minBlockY = minSection * 16;
             int maxBlockY = (maxSection + 1) * 16 - 1;

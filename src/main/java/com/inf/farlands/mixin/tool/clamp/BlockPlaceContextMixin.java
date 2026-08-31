@@ -15,11 +15,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 钳制模式虚拟面放置：虚拟命中（面下空气格）时 replaceClicked=false——
- * BlockPlaceContext.getClickedPos() 改为 relativePos（面下方块的 UP 邻居 = 面上方），
- * 而非命中位置本身（默认 replaceClicked=true 会放到面下）。
- * 识别不依赖客户端静态字段（服务端无 pick）：钳制开启 + 命中位置是虚拟面下空气格
- * （y == floor(玩家脚y/16)*16 - 1）——与服务端接收到的虚拟命中（位置特征一致）。
+ * 钳制模式虚拟面放置：虚拟命中时 replaceClicked=false——
+ * BlockPlaceContext.getClickedPos() 改为 relativePos，它是面下方块的 UP 邻居，也就是面上方那格，
+ * 而非命中位置本身。默认 replaceClicked=true 会放到面下。
+ * 识别不依赖客户端静态字段，因为服务端无 pick：钳制开启且命中位置是虚拟面下空气格，
+ * y == floor(玩家脚y/16)*16 - 1——与服务端接收到的虚拟命中位置特征一致。
  */
 @Mixin(BlockPlaceContext.class)
 public class BlockPlaceContextMixin {

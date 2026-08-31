@@ -16,9 +16,9 @@ import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.minecraft.network.chat.Component;
 
 /**
- * 客户端（渲染端）诊断命令：/farlands client section light dump —— 与服务端
- * FLDUMP 同格式输出客户端光照层 + 方块矩阵，用于对比定位同步断链。
- * 本类引用客户端类（Minecraft），只在客户端加载（服务端不注册、不加载）。
+ * 客户端诊断命令：/farlands client section light dump —— 与服务端
+ * FLDUMP 同格式输出客户端光照层 + 方块数据，用于对比定位同步断链。
+ * 本类引用客户端类 Minecraft，只在客户端加载，服务端不注册、不加载。
  */
 public class ClientFarLandsCommands {
 
@@ -33,7 +33,10 @@ public class ClientFarLandsCommands {
                                                         .executes(ctx -> dumpClient(ctx.getSource()))))
                                         .then(Commands.literal("biome")
                                                 .then(Commands.literal("dump")
-                                                        .executes(ctx -> dumpBiomeClient(ctx.getSource())))))));
+                                                        .executes(ctx -> dumpBiomeClient(ctx.getSource()))))
+                                        .then(Commands.literal("block")
+                                                .then(Commands.literal("dump")
+                                                        .executes(ctx -> dumpBlocksClient(ctx.getSource())))))));
     }
 
     @SuppressWarnings("null")
@@ -70,10 +73,29 @@ public class ClientFarLandsCommands {
                     pos.getX(), pos.getY(), pos.getZ(), sec.x(), sec.y(), sec.z());
             FarLandsCommands.dumpLayer(le, LightLayer.SKY, sec);
             FarLandsCommands.dumpLayer(le, LightLayer.BLOCK, sec);
-            FarLandsCommands.dumpBlocks(mc.level, sec);
             source.sendSuccess(() -> Component.translatable("commands.inf_farlands.client.section.light.dump"), false);
         } catch (Exception e) {
             InfFarlands.LOGGER.error("FLDUMP client err", e);
+        }
+        return 1;
+    }
+
+    /** 方块数据独立命令：/farlands client section block dump。 */
+    @SuppressWarnings("null")
+    private static int dumpBlocksClient(CommandSourceStack source) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null || mc.player == null) {
+                return 1;
+            }
+            BlockPos pos = mc.player.blockPosition();
+            SectionPos sec = SectionPos.of(pos);
+            InfFarlands.LOGGER.info("BLOCKDUMP client pos={},{},{} sec={},{},{}",
+                    pos.getX(), pos.getY(), pos.getZ(), sec.x(), sec.y(), sec.z());
+            FarLandsCommands.dumpBlocks(mc.level, sec);
+            source.sendSuccess(() -> Component.translatable("commands.inf_farlands.client.section.block.dump"), false);
+        } catch (Exception e) {
+            InfFarlands.LOGGER.error("BLOCKDUMP client err", e);
         }
         return 1;
     }

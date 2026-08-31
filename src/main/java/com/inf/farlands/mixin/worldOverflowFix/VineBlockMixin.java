@@ -10,9 +10,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 藤蔓随机刻生长的维度高度边界（L229 向上 getMaxBuildHeight / L256 向下
- * getMinBuildHeight）——负极端 Y 藤蔓不生长。javap 验证：randomTick 内
- * ServerLevel.getMaxBuildHeight:()I 与 getMinBuildHeight:()I 各 1 处。
+ * 藤蔓随机刻生长的维度高度边界：向上 getMaxBuildHeight / 向下
+ * getMinBuildHeight——负极端 Y 藤蔓不生长。
  */
 @Mixin(VineBlock.class)
 public abstract class VineBlockMixin {

@@ -4,8 +4,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
-import com.inf.farlands.HashUtil;
-import com.inf.farlands.IntBlockPos;
+import com.inf.farlands.util.HashUtil;
+import com.inf.farlands.util.IntBlockPos;
 
 import net.minecraft.core.BlockPos;
 
@@ -58,7 +58,7 @@ public abstract class BlockPosMixin {
         int ny = pos.y + dy;
         int nz = pos.z + dz;
         long key = HashUtil.hashPos((long) nx, (long) ny, (long) nz);
-        HashUtil.putBlock(key, new IntBlockPos(nx, ny, nz));
+        HashUtil.putBlock(key, nx, ny, nz);
         return key;
     }
 
@@ -81,14 +81,14 @@ public abstract class BlockPosMixin {
         int y = self.getY();
         int z = self.getZ();
         long key = HashUtil.hashPos((long) x, (long) y, (long) z);
-        HashUtil.putBlock(key, new IntBlockPos(x, y, z));
+        HashUtil.putBlock(key, x, y, z);
         return key;
     }
 
     @Overwrite
     public static long asLong(int x, int y, int z) {
         long key = HashUtil.hashPos((long) x, (long) y, (long) z);
-        HashUtil.putBlock(key, new IntBlockPos(x, y, z));
+        HashUtil.putBlock(key, x, y, z);
         return key;
     }
 }

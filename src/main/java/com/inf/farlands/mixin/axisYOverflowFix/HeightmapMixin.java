@@ -73,8 +73,8 @@ public class HeightmapMixin {
 
     /**
      * 修复：服务端 ensureCapacity 为极端 Y 高度图值扩容 BitStorage 后，序列化的
-     * long[] 大于客户端默认 9 位分配。不落入 primeHeightmaps（其因
-     * getHighestSectionPosition 返回极端值而冻结），而是重建 BitStorage 匹配
+     * long[] 大于客户端默认 9 位分配。不落入 primeHeightmaps，它因
+     * getHighestSectionPosition 返回极端值而冻结；而是重建 BitStorage 匹配
      * 服务端数据大小并直接复制。
      */
     @Overwrite
@@ -91,8 +91,8 @@ public class HeightmapMixin {
     }
 
     /**
-     * 纵深防御：钳制 primeHeightmaps 的循环，任何未来路径在窗口覆盖极端 Y 的
-     * chunk 上到达它时，每列不会迭代 21 亿次。
+     * 钳制 primeHeightmaps 的循环：窗口覆盖极端 Y 的 chunk 到达它时，
+     * 每列不会迭代 21 亿次。
      */
     @SuppressWarnings("removal")
     @Redirect(method = "primeHeightmaps", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/ChunkAccess;getHighestSectionPosition()I"))

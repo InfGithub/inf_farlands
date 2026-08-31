@@ -20,13 +20,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 修复声音坐标溢出 vanilla int*8 编码的问题。
  * <p>
  * vanilla 以 {@code (int)(coord * 8.0)} 存储声音位置——在 |Y| > 268M 时饱和于
- * Integer.MAX_VALUE，客户端解码出垃圾位置（约 2.68 亿格远），OpenAL 衰减使
- * 声音静音（箱子、木桶、任何服务端 {@code playSound(double...)}）。
+ * Integer.MAX_VALUE，客户端解码出约 2.68 亿格远的垃圾位置，OpenAL 衰减使
+ * 箱子、木桶及任何服务端 {@code playSound(double...)} 的声音静音。
  * <p>
- * 本 mixin 保持完全相同的线上布局（sound、source、x、y、z、volume、pitch、
- * seed），但坐标以 8 字节 long 传输（{@code (long)(coord * 8.0)}）。解码通过
+ * 本 mixin 保持与 vanilla 完全相同的线上布局 sound、source、x、y、z、volume、
+ * pitch、seed，但坐标以 8 字节 long 编码为 {@code (long)(coord * 8.0)}。解码通过
  * {@link Redirect} 三个 {@code readInt} 调用改用 {@code readLong}；原 int
- * 字段保留饱和值但不再读取（getter 被覆写为从 long 字段解码）。包增大 12 字节。
+ * 字段保留饱和值但不再读取。包增大 12 字节。
  */
 @Mixin(ClientboundSoundPacket.class)
 public abstract class ClientboundSoundPacketMixin {

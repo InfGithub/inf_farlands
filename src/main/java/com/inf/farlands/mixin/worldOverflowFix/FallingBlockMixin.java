@@ -10,8 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 下落方块（沙/砾石）tick 的 -64 高度检查（L45）——负极端 Y 无法下落。
- * javap 验证：tick 内 ServerLevel.getMinBuildHeight:()I 1 处。
+ * 沙、砾石等下落方块 tick 的 -64 高度检查——负极端 Y 无法下落。
  */
 @Mixin(FallingBlock.class)
 public abstract class FallingBlockMixin {

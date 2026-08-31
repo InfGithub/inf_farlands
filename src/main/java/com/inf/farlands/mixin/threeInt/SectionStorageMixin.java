@@ -8,7 +8,7 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.DynamicOps;
 
-import com.inf.farlands.IntSectionPos;
+import com.inf.farlands.util.IntSectionPos;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;

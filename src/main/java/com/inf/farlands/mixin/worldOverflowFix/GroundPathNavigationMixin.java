@@ -19,35 +19,21 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
 
 /**
- * 地面实体寻路位置目标（createPath(BlockPos)）的目标规范化扫描。
+ * 地面实体寻路位置目标 createPath(BlockPos) 的目标规范化扫描。
  *
- * vanilla 用维度高度范围（LevelReader.getMinBuildHeight/getMaxBuildHeight
- * = dimensionType().minY()/height()，overworld -64/320）作为空气目标的
- * 向下/向上扫描边界——本 mod 允许方块存在于 ±2.14B 任意 Y，但该边界未
- * Config 化 → 极端 Y 空气目标向下扫 2.14B 格到 -64 找不到支撑方块 → 目标
- * 被改写为 -63（基岩上方）→ 寻路到地底/失败。
+ * vanilla 用 overworld 维度高度范围 -64/320 作为空气目标的向下/向上扫描
+ * 边界——本 mod 允许方块存在于 ±2.14B 任意 Y，极端 Y 空气目标向下扫 2.14B
+ * 格到 -64 找不到支撑方块 → 目标被改写为 -63 → 寻路到地底/失败。
  *
- * 修复：
- * 1. 扫描边界 → Config.worldGenMinY/MaxY 与目标 Y ±maxCapIter 的交集（long 防
- * int 溢出——±MAX_BLOCK 处 ±maxCapIter 会溢出）
- * 2. 扫描区间内完全无方块（纯虚空）→ 目标原样交给 A*（可达性由 A*
- * tryFindFirstGroundNodeBelow 的 maxFallDistance 判定，不冻结）
- * 3. vanilla 的 super.createPath(pos, accuracy) 等价替换为
- * ((PathNavigation)(Object)this).createPath(ImmutableSet.of(pos), accuracy)
- * ——public createPath(Set, int) 转发完全相同的 4 参调用（L129-131 vs
- * L121-123），无覆写无递归；mixin 类不继承 PathNavigation，不能写 super
+ * 修复：扫描边界 = Config.worldGenMinY/MaxY 与目标 Y ±maxCapIter 的交集。
  *
- * priority = 100：@Overwrite 先应用，PathNavigationMixin（默认 1000）的
- * 
- * @Inject HEAD（XZ 超界返回 null）后注入到新方法体——sodium 先例机制。
- *         javap 验证：方法签名 createPath(Lnet/minecraft/core/BlockPos;I)
- *         Lnet/minecraft/world/level/pathfinder/Path;，4 个边界调用点
- *         （getMinBuildHeight ×2 / getMaxBuildHeight ×2）。
+ * priority = 100：@Overwrite 先应用，PathNavigationMixin 默认 1000 的
+ * @Inject HEAD 后注入到新方法体，XZ 超界时返回 null。
  */
 @Mixin(value = GroundPathNavigation.class, priority = 100)
 public abstract class GroundPathNavigationMixin {
 
-    /** 扫描上限（对齐光照 maxCapIter cap 先例；maxFallDistance=3 意味着实际可达目标的支撑方块必在 3 格内） */
+    /** 扫描上限：maxFallDistance=3 意味着实际可达目标的支撑方块必在 3 格内 */
     private static final int SCAN_LIMIT = Config.maxCapIter;
 
     private static final Field F_LEVEL;
@@ -108,7 +94,7 @@ public abstract class GroundPathNavigationMixin {
                     blockpos = blockpos.above();
                 }
 
-                // 扫描区间内完全无方块（纯虚空）→ 目标原样交给 A*，不改写目标位置
+                // 扫描区间内完全无方块 → 目标原样交给 A*
                 if (blockpos.getY() >= ceilLimit && levelchunk.getBlockState(blockpos).isAir()) {
                     pos = originalPos;
                 } else {

@@ -40,7 +40,11 @@ runs {
     client {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         jvmArguments "-javaagent:${layout.projectDirectory.file("build/libs/${mod_id}-${mod_version}.jar").asFile.absolutePath}"
-        jvmArguments '-XX:+HeapDumpOnOutOfMemoryError', '-XX:HeapDumpPath=D:/Desktop/inf_farlands/heap.hprof'
+        // HeapDump 路径修正：原 D:/Desktop/... 是 Windows 路径，Linux 写不了 → OOM 时 dump 失败
+        jvmArguments '-XX:+HeapDumpOnOutOfMemoryError', '-XX:HeapDumpPath=/data/code/Codey/inf_farlands/run/client/heapdump.hprof'
+        // Xmx 8G——16G 会让系统内存耗尽连带杀 VSCode；8G 安全（堆满时
+        // 占大头对象与 16G 相同），OOM 自动 dump 定位驻留
+        jvmArguments '-Xms4G', '-Xmx8G'
     }
 
     server {
@@ -67,8 +71,6 @@ dependencies {
     implementation 'org.ow2.asm:asm:9.5'
     // NeoForge 已内置 MixinExtras 0.5.3（jarjar）——compileOnly 仅编译期可见，运行期用 neoforge 自带
     compileOnly 'io.github.llamalad7:mixinextras-neoforge:0.5.3'
-    // localRuntime 'spark:spark:1.10.124-neoforge'
-    // localRuntime files('libs/spark-1.10.124-neoforge.jar')  // 暂时禁用
 
 }
 

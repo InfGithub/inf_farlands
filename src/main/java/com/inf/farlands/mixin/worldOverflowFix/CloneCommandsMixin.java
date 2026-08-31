@@ -13,13 +13,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 留档项 #1 修复：/clone 的体积检查（L238）同 XSpan int 溢出问题。
+ * /clone 的体积检查同 XSpan int 溢出问题。
  *
- * clone 的 @Inject HEAD 不可行（参数含 package-private 内部类
- * DimensionAndPosition/Predicate/Mode）——改 @Redirect fromCorners 调用点
- * （L229，handler 只需 Vec3i×2 + 外层方法参数 CommandSourceStack，绕开内部类）。
- * 超限抛 ERROR_AREA_TOO_LARGE（传播到 clone 的 throws CommandSyntaxException）。
- * 单轴跨度检查（轴跨度 > limit ⇒ 体积 > limit）与原版体积检查语义等价。
+ * clone 的 @Inject HEAD 不可行，参数含 package-private 内部类
+ * DimensionAndPosition/Predicate/Mode——改 @Redirect fromCorners 调用点，
+ * 绕开内部类。
+ * 超限抛 ERROR_AREA_TOO_LARGE，传播到 clone 的 throws CommandSyntaxException。
+ * 单轴跨度检查中轴跨度 > limit 则 体积 > limit，与原版体积检查语义等价。
  */
 @Mixin(CloneCommands.class)
 public abstract class CloneCommandsMixin {

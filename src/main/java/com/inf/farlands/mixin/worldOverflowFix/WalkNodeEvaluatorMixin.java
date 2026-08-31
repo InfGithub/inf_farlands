@@ -29,23 +29,22 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 /**
  * 极端 Y 空中/水下 mob 的寻路扫描 -64 下限。
  *
- * getStart（L72）：空中 mob 向下扫到 getMinBuildHeight()（-64）找支撑方块——
- * 极端 Y 空中 mob（掉落/击飞/tp 未落地）扫 2.14B 次 getBlockState（每 16 格
- * 懒创建 section → OOM/冻结）→ 撞 -64 基岩 → 起点错位到 -63。
- * tryFindFirstNonWaterBelow（L330）：水下 mob 向下扫同样问题（极端 Y 放置水）。
- * getPathTypeStatic（L452）：`j >= getMinBuildHeight() + 1`——-64 以下节点直接
- * OPEN 跳过下方检查——负极端 Y 节点本应检查下方（放置方块），正确性错误。
+ * getStart：空中 mob 向下扫到 getMinBuildHeight() = -64 找支撑方块——
+ * 极端 Y 空中 mob 因掉落/击飞/tp 未落地，扫 2.14B 次 getBlockState，每 16 格
+ * 懒创建 section → OOM/冻结 → 撞 -64 基岩 → 起点错位到 -63。
+ * tryFindFirstNonWaterBelow：水下 mob 向下扫同样问题，极端 Y 放置水。
+ * getPathTypeStatic：`j >= getMinBuildHeight() + 1`——-64 以下节点直接
+ * OPEN 跳过下方检查——负极端 Y 节点本应检查下方放置的方块，正确性错误。
  *
  * 修复：
- * 1. @Overwrite getStart（vanilla L53-101 逐行，javap 150 指令对照）——空中
- * 扫描下限 → max(Config.worldGenMinY, mobY - maxCapIter)（long 防溢出）；找不到
- * 支撑 → 起点 = mob 实际位置（A* 自然处理，不冻结；平台旁掉落起点正确）
- * 2. @Redirect tryFindFirstNonWaterBelow → 同上限（水柱 maxCapIter 格内必有底）
- * 3. @Redirect getPathTypeStatic(PathfindingContext,…) → Config.worldGenMinY
- * （j >= Config+1，正常 Y 零回归）
+ * 1. @Overwrite getStart——空中扫描下限 → max(Config.worldGenMinY,
+ * mobY - maxCapIter)
+ * 2. @Redirect tryFindFirstNonWaterBelow → 同上限，水柱 maxCapIter 格内必有底
+ * 3. @Redirect getPathTypeStatic(PathfindingContext,…) → Config.worldGenMinY，
+ * j >= Config+1，正常 Y 零回归
  *
- * 继承字段 mob/currentContext 用反射（@Shadow 不解析继承成员——bugs.md 教训）；
- * canFloat() 是 NodeEvaluator 的 public getter（javap 确认）→ cast 直接调用；
+ * 继承字段 mob/currentContext 用反射，@Shadow 不解析继承成员；
+ * canFloat() 是 NodeEvaluator 的 public getter → cast 直接调用；
  * getStartNode/canStartAt 是 WalkNodeEvaluator 自身 protected 方法 → @Shadow。
  */
 @Mixin(WalkNodeEvaluator.class)
@@ -127,7 +126,7 @@ public abstract class WalkNodeEvaluatorMixin {
                     }
                 }
 
-                // 扫描区间内无支撑（极端 Y 纯空气）→ 起点 = mob 实际位置（A* 自然处理）
+                // 极端 Y 纯空气 → 扫描区间内无支撑 → 起点 = mob 实际位置，交由 A* 自然处理
                 if (!foundGround) {
                     i = mob.getBlockY();
                 }

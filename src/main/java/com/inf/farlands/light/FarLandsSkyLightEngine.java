@@ -1,12 +1,11 @@
 package com.inf.farlands.light;
 
-import com.inf.farlands.HashUtil;
-import com.inf.farlands.IntBlockPos;
-import com.inf.farlands.IntSectionPos;
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.util.HashUtil;
+import com.inf.farlands.util.IntBlockPos;
+import com.inf.farlands.util.IntSectionPos;
+import com.inf.farlands.window.WindowedChunk;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
 import java.util.Map;
@@ -21,6 +20,7 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.LightChunk;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.ChunkSkyLightSources;
@@ -37,7 +37,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * {@code getStoredLevel} → 直接 {@code DataLayer.get}，
  * {@code setStoredLevel} → 直接 {@code DataLayer.set}。
  *
- * <p>天空光按 256 格子区域划分（每区 16 个 section）。每个活跃子区域的顶部
+ * <p>天空光按 256 格子区域划分，每区 16 个 section。每个活跃子区域的顶部
  * section 以 {@code DataLayer(15)} 播种。传播在子区域边界停止。
  */
 @SuppressWarnings({ "null" })
@@ -56,12 +56,15 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     private final ConcurrentHashMap<Long, Integer> topSections;
 
     // ---- propagation queues ----
-    private final LongArrayFIFOQueue increaseQueue = new LongArrayFIFOQueue();
-    private final LongArrayFIFOQueue decreaseQueue = new LongArrayFIFOQueue();
+    // 初始 131072，每条目 4-long，满时翻倍扩容：播种/传播每批 enqueue 巨量。
+    // M1：LongRingQueue 只在 enqueue 时扩容、dequeue 不缩容——fastutil LongArrayFIFOQueue
+    // expand/reduce 反复交替的扩-缩震荡 → JFR resize 269GB 分配风暴。
+    private final LongRingQueue increaseQueue = new LongRingQueue(131072);
+    private final LongRingQueue decreaseQueue = new LongRingQueue(131072);
     final LongOpenHashSet blockNodesToCheck = new LongOpenHashSet(512, 0.5F);
     private final Object queueLock = new Object();
 
-    /** 传播写入影响的 section（对齐 vanilla sectionsAffectedByLightUpdates）——runLightUpdates 末尾通知。 */
+    /** 传播写入影响的 section，对齐 vanilla sectionsAffectedByLightUpdates，runLightUpdates 末尾通知。 */
     private final LongOpenHashSet affectedSections = new LongOpenHashSet();
 
     // ---- chunk access ----
@@ -70,9 +73,52 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     private final long[] lastChunkKeys = new long[2];
     private final LightChunk[] lastChunks = new LightChunk[2];
 
-    // ---- 传播批次局部缓存：引用共享（传播 set DataLayer 数组 = 改 CHM），
-    // 纯读加速（省 CHM.get 的 Long 装箱 + volatile）。任务内单线程，批次入口 clear。----
-    private final Long2ObjectOpenHashMap<DataLayer> taskLocal = new Long2ObjectOpenHashMap<>();
+    // ---- 传播批次局部缓存：引用共享，传播 set DataLayer 数组即改 CHM，
+    // 纯读加速，省 CHM.get 的 Long 装箱与 volatile 读。任务内单线程，批次入口 clear。
+    // 预分配 1024，传播批次访问的 section 数可达几百，消 rehash 12.7G；fastutil clear
+    // 保留数组，一次预分配复用。----
+    private final Long2ObjectOpenHashMap<DataLayer> taskLocal = new Long2ObjectOpenHashMap<>(1024);
+
+    // M3/O1：getState section 缓存用 2-slot LRU——垂直传播 src/邻居 A/B section 交替，
+    // 1-slot 反复 miss 装箱 3.6G；2-slot 正好覆盖。任务入口清空——防跨任务读旧
+    // section，客户端 replaceWithPacketData 换新对象；服务端 fill 原地改 section，
+    // setBlockState 保持同对象引用 → 缓存读到更新内容，安全。
+    private int lastSecX1 = Integer.MIN_VALUE;
+    private int lastSecY1 = Integer.MIN_VALUE;
+    private int lastSecZ1 = Integer.MIN_VALUE;
+    private LevelChunkSection lastSec1;
+    private int lastSecX2 = Integer.MIN_VALUE;
+    private int lastSecY2 = Integer.MIN_VALUE;
+    private int lastSecZ2 = Integer.MIN_VALUE;
+    private LevelChunkSection lastSec2;
+
+    // P5：任务内 section 缓存，getState 2-slot miss 时查询——传播任务 section 集合有限，
+    // 首访后全命中，免 CHM.get(sy) 装箱+桶查，JFR getState 22.8%。与 taskLocal 同
+    // 生命周期，任务入口 clear 保留数组复用。
+    private final Long2ObjectOpenHashMap<LevelChunkSection> taskSections =
+            new Long2ObjectOpenHashMap<>(128);
+
+    // N2：任务内 secKey 缓存，缓存 getStoredLevel/setStoredLevel 的 section key；传播链
+    // 格子连续同 section，命中率高，省 hashSection 纯计算。nSec/checkNode 不缓存，
+    // 因为邻居横跨/不连续，miss 时多一次比较负收益。
+    private int lastKx = Integer.MIN_VALUE;
+    private int lastKy = Integer.MIN_VALUE;
+    private int lastKz = Integer.MIN_VALUE;
+    private long lastKeyVal;
+
+    /** N2：section key 计算 + 1-slot 缓存，同 section 连续命中省 hashSection。 */
+    private long secKeyOf(int x, int y, int z) {
+        int sx = x >> 4, sy = y >> 4, sz = z >> 4;
+        if (sx == this.lastKx && sy == this.lastKy && sz == this.lastKz) {
+            return this.lastKeyVal;
+        }
+        long k = HashUtil.hashSection((long) sx, (long) sy, (long) sz);
+        this.lastKx = sx;
+        this.lastKy = sy;
+        this.lastKz = sz;
+        this.lastKeyVal = k;
+        return k;
+    }
 
     private DataLayer localGet(long sec) {
         DataLayer dl = taskLocal.get(sec);
@@ -103,7 +149,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         this(chunkSource, new FarLandsDataLayerStorage(), new ConcurrentHashMap<>());
     }
 
-    /** 服务端共享 storage/topSections 构造（多个引擎实例共享同一仓库，供并行任务池化复用）。 */
+    /** 服务端共享 storage/topSections 构造，多个引擎实例共享同一仓库，供并行任务池化复用。 */
     FarLandsSkyLightEngine(LightChunkGetter chunkSource, FarLandsDataLayerStorage storage,
             ConcurrentHashMap<Long, Integer> topSections) {
         this.chunkSource = chunkSource;
@@ -124,10 +170,10 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         DataLayer dl = storage.get(secKey);
         if (dl != null) return dl.get(rx, ry, rz);
 
-        // 快速失败：该列最高有层 section ≤ 当前 → 区内（sy+1..topSY）必无层 → 搜索必返回 15。
-        // topSections 只增不减（merge max）、初始无条目（null 等价旧 MIN_VALUE）——
-        // stale（remove 不更新）时只偏高不偏低 → 快速失败结果与搜索严格一致，绝不误判。
-        // CHM 弱一致读到旧值（偏低）→ 快速失败不触发 → 走搜索 → 结果仍正确。
+        // 快速失败：该列最高有层 section ≤ 当前 → sy+1..topSY 区间必无层 → 搜索必返回 15。
+        // topSections 只增不减，merge 取 max；初始无条目，null 等价旧 MIN_VALUE——
+        // stale 时只偏高不偏低，因为 remove 不更新 → 快速失败结果与搜索严格一致，绝不误判。
+        // CHM 弱一致读到旧值即偏低 → 快速失败不触发 → 走搜索 → 结果仍正确。
         Integer top = topSections.get(HashUtil.hashSection((long) cx, 0, (long) cz));
         if (top == null || top <= sy) {
             return 15;
@@ -138,7 +184,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         int topSY = subRegion * 16 + 15;
         for (int s = sy + 1; s <= topSY; s++) {
             dl = storage.get(HashUtil.hashSection((long) cx, (long) s, (long) cz));
-            if (dl != null) return dl.get(rx, 0, rz); // 读层底部行（对齐 vanilla flatIndex y=0——遮挡列读 0 防幽灵亮）
+            if (dl != null) return dl.get(rx, 0, rz); // 读层底部行，对齐 vanilla flatIndex y=0，遮挡列读 0 防幽灵亮
         }
 
         // 在所有数据之上或子区域未激活 —— 虚拟天空顶
@@ -147,6 +193,11 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
 
     public void checkBlock(BlockPos pos) {
         synchronized (queueLock) {
+            // P1：补注册 side-channel——checkNode 反查依赖；播种不再 putBlock 注册，
+            // 客户端 runLightUpdates 路径的 levelPos 无 asLong 注册，miss → 位解码垃圾坐标。
+            HashUtil.putBlock(HashUtil.hashPos(
+                    (long) pos.getX(), (long) pos.getY(), (long) pos.getZ()),
+                    pos.getX(), pos.getY(), pos.getZ());
             blockNodesToCheck.add(HashUtil.hashPos(
                     (long) pos.getX(), (long) pos.getY(), (long) pos.getZ()));
         }
@@ -162,9 +213,9 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         int subRegion = sp.y >> 4;
         int topSY = subRegion * 16 + 15;
         if (sp.y == topSY && dl.isEmpty()) {
-            // 区顶虚拟天穹：仅当该列最低光源 <= 区顶底（露天透光到区顶）才 fill 15。
-            // 最低光源在区顶之上（该区顶被上方遮挡）→ 不 fill——深地下实心区顶被填
-            // 15 → 客户端 getLightValue 向上搜索命中区顶 15 → 全亮（破坏出现 15 光束）。
+            // 区顶虚拟天穹：仅当该列最低光源 <= 区顶底且露天透光到区顶时才 fill 15。
+            // 最低光源在区顶之上，即该区顶被上方遮挡 → 不 fill——深地下实心区顶被填
+            // 15 → 客户端 getLightValue 向上搜索命中区顶 15 → 全亮，破坏时出现 15 光束。
             ChunkSkyLightSources src = getChunkSources(sp.x, sp.z);
             if (src == null) {
                 dl.fill(15);
@@ -180,13 +231,15 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         return dl;
     }
 
-    /** 服务端 chunk 卸载清理：side-channel 反查移除该 chunk 全部光照层（storage 不再随卸载增长）。 */
+    /** 服务端 chunk 卸载清理：side-channel 反查移除该 chunk 全部光照层，storage 不再随卸载增长。 */
     public void removeChunk(ChunkPos pos) {
         storage.removeChunk(ChunkPos.asLong(pos.x, pos.z));
-        // topSections 故意不清：stale 偏高 → O1 快速失败不触发（安全）。
-        // ConcurrentHashMap：initializeLight（commonPool 异步）与主线程（setDataLayer/
-        // updateSectionStatus）并发写安全（原 Long2IntOpenHashMap 并发写 → rehash 损坏
-        // → AIOOBE CTD，2026-08-23 实崩）。
+        // 清理该 column 的 topSections 条目，防随 chunk 卸载永存；remove 后 getLightValue
+        // 快速失败不触发 → 走搜索，层仍在 storage，正确。重载播种 updateTopSection re-merge。
+        this.topSections.remove(HashUtil.hashSection((long) pos.x, 0, (long) pos.z));
+        // ConcurrentHashMap 让 initializeLight 在 commonPool 异步执行与主线程的
+        // setDataLayer/updateSectionStatus 并发写安全；原 Long2IntOpenHashMap 并发写会
+        // rehash 损坏 → AIOOBE CTD。
     }
 
     public void setDataLayer(long sectionKey, DataLayer layer, long chunkKey) {
@@ -194,30 +247,36 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
         updateTopSection(IntSectionPos.getSectionPos(sectionKey));
     }
 
+    /** 移除某 section 的光照层，供 fsa 清理使用。 */
+    public void removeDataLayer(long sectionKey, long chunkKey) {
+        storage.remove(sectionKey, chunkKey);
+    }
+
     private void updateTopSection(IntSectionPos sp) {
         long zeroNode = HashUtil.hashSection((long) sp.x, 0, (long) sp.z);
-        // 原子"只增不减"：absent → sp.y+1；present → max（原 if (cur < sp.y+1) put）
+        // 原子"只增不减"：absent → sp.y+1；present → max，取代原 if (cur < sp.y+1) put
         topSections.merge(zeroNode, sp.y + 1, (a, b) -> Math.max(a.intValue(), b.intValue()));
     }
 
     // ==================== 服务端 per-chunk 任务入口 ====================
 
     /**
-     * 处理一个 chunk 的方块变化 + section 变化。任务独占本引擎实例（单线程），
-     * 队列/affectedSections 在任务内消耗。先建层（section 变化）再 checkNode
-     * （方块变化）——checkNode 依赖所在 section 已建层。
+     * 处理一个 chunk 的方块变化 + section 变化。任务独占本引擎实例，单线程执行，
+     * 队列/affectedSections 在任务内消耗。先建层处理 section 变化，再 checkNode
+     * 处理方块变化——checkNode 依赖所在 section 已建层。
      */
     public void processBlocksChanged(int chunkX, int chunkZ, Set<BlockPos> positions,
             Map<Integer, Boolean> sectionChanges) {
         taskLocal.clear(); // 批次入口
-        blockNodesToCheck.clear(); // 防池化复用残留（任务路径不经 blockNodesToCheck）
+        clearSectionCache(); // M3 任务入口
+        blockNodesToCheck.clear(); // 防池化复用残留，任务路径不经 blockNodesToCheck
         if (sectionChanges != null) {
             for (Map.Entry<Integer, Boolean> e : sectionChanges.entrySet()) {
                 updateSectionStatus(SectionPos.of(chunkX, e.getKey(), chunkZ), e.getValue());
             }
         }
         for (BlockPos pos : positions) {
-            // 必须用 asLong()（会 putBlock 注册 side-channel）——直接 hashPos 会 miss，
+            // 必须用 asLong()，它会 putBlock 注册 side-channel——直接 hashPos 会 miss，
             // 传播链反查位解码垃圾坐标 → 光照写错位置 → 损坏。
             checkNode(pos.asLong());
         }
@@ -226,10 +285,11 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
 
     /**
      * 处理传播队列 + 通知。方块变化任务与播种任务共用——propagateLightSources 只
-     * enqueue 光源，必须经本方法 propagate 才扩散（原同步模型靠每 tick runLightUpdates）。
+     * enqueue 光源，必须经本方法 propagate 才扩散；原同步模型靠每 tick runLightUpdates。
      */
     public void runPropagation() {
         taskLocal.clear(); // 批次入口；播种后传播
+        clearSectionCache(); // M3 任务入口
         propagateDecreases();
         propagateIncreases();
         clearChunkCache();
@@ -247,6 +307,7 @@ public class FarLandsSkyLightEngine implements LayerLightEventListener {
     public int runLightUpdates() {
         synchronized (queueLock) {
 taskLocal.clear(); // 批次入口
+clearSectionCache(); // M3 任务入口
             var it = blockNodesToCheck.iterator();
             while (it.hasNext()) checkNode(it.nextLong());
             blockNodesToCheck.clear();
@@ -261,15 +322,15 @@ taskLocal.clear(); // 批次入口
         }
     }
 
-    // ==================== affected-section 通知（对齐 vanilla swapSectionMap → onLightUpdate）====================
+    // ==================== affected-section 通知：对齐 vanilla swapSectionMap → onLightUpdate ====================
 
-    /** 写入影响 block 周围所有 section（对齐 vanilla setStoredLevel 的 aroundAndAtBlockPos）。 */
-    private void markAffected(long packedPos) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        SectionPos.aroundAndAtBlockPos(bp.x, bp.y, bp.z, affectedSections::add);
+    /** 写入影响 block 周围所有 section，对齐 vanilla setStoredLevel 的 aroundAndAtBlockPos。
+     * 传坐标，因为调用点已知 x/y/z，省 IntBlockPos.getBlockPos 反查，是传播 get 的优化。 */
+    private void markAffected(int x, int y, int z) {
+        SectionPos.aroundAndAtBlockPos(x, y, z, affectedSections::add);
     }
 
-    /** 传播后通知（服务端 → sectionLightChanged → 增量包；客户端 → setSectionDirty 渲染刷新）。 */
+    /** 传播后通知，服务端走 sectionLightChanged 发增量包，客户端走 setSectionDirty 刷新渲染。 */
     private void notifyLightChanges() {
         if (affectedSections.isEmpty()) {
             return;
@@ -277,7 +338,7 @@ taskLocal.clear(); // 批次入口
         for (long key : affectedSections) {
             IntSectionPos sp = HashUtil.getSection(key);
             if (sp == null) {
-                continue; // 无 side-channel 条目（标记点漏 putSection）→ 跳过防垃圾坐标
+                continue; // 无 side-channel 条目，说明标记点漏 putSection → 跳过防垃圾坐标
             }
             chunkSource.onLightUpdate(LightLayer.SKY, SectionPos.of(sp.x, sp.y, sp.z));
         }
@@ -289,17 +350,20 @@ taskLocal.clear(); // 批次入口
     // 移植自 LightEngine L164-181
     private int propagateIncreases() {
         int i;
-        for (i = 0; increaseQueue.size() >= 2; i++) {
-            long pos = increaseQueue.dequeueLong();
+        // 队列条目 4-long 即 x,y,z,entry——坐标随条目走，传播免 side-channel 反查，即 P1
+        for (i = 0; increaseQueue.size() >= 4; i++) {
+            int x = (int) increaseQueue.dequeueLong();
+            int y = (int) increaseQueue.dequeueLong();
+            int z = (int) increaseQueue.dequeueLong();
             long entry = increaseQueue.dequeueLong();
-            int cur = getStoredLevel(pos);
+            int cur = getStoredLevel(x, y, z);
             int fromEntry = LightEngine.QueueEntry.getFromLevel(entry);
             if (LightEngine.QueueEntry.isIncreaseFromEmission(entry) && cur < fromEntry) {
-                setStoredLevel(pos, fromEntry);
+                setStoredLevel(x, y, z, fromEntry);
                 cur = fromEntry;
             }
             if (cur == fromEntry) {
-                propagateIncrease(pos, entry, cur);
+                propagateIncrease(x, y, z, entry, cur);
             }
         }
         return i;
@@ -308,112 +372,115 @@ taskLocal.clear(); // 批次入口
     // 移植自 LightEngine L184-193
     private int propagateDecreases() {
         int i;
-        for (i = 0; decreaseQueue.size() >= 2; i++) {
-            long pos = decreaseQueue.dequeueLong();
+        for (i = 0; decreaseQueue.size() >= 4; i++) {
+            int x = (int) decreaseQueue.dequeueLong();
+            int y = (int) decreaseQueue.dequeueLong();
+            int z = (int) decreaseQueue.dequeueLong();
             long entry = decreaseQueue.dequeueLong();
-            propagateDecrease(pos, entry);
+            propagateDecrease(x, y, z, entry);
         }
         return i;
     }
 
-    void enqueueIncrease(long pos, long entry) {
-        increaseQueue.enqueue(pos);
+    void enqueueIncrease(int x, int y, int z, long entry) {
+        increaseQueue.enqueue(x);
+        increaseQueue.enqueue(y);
+        increaseQueue.enqueue(z);
         increaseQueue.enqueue(entry);
     }
 
-    void enqueueDecrease(long pos, long entry) {
-        decreaseQueue.enqueue(pos);
+    void enqueueDecrease(int x, int y, int z, long entry) {
+        decreaseQueue.enqueue(x);
+        decreaseQueue.enqueue(y);
+        decreaseQueue.enqueue(z);
         decreaseQueue.enqueue(entry);
     }
 
     // ---- storage read/write (vanilla: getStoredLevel / setStoredLevel) ----
+    // 改传坐标，即 P1：调用点传播队列/checkNode 处坐标已知——免 IntBlockPos.getBlockPos
+    // 反查，即 side-channel StripedMap.get，JFR mapget ~37%。
 
-    private int getStoredLevel(long packedPos) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
+    private int getStoredLevel(int x, int y, int z) {
+        long sec = secKeyOf(x, y, z);
         DataLayer dl = localGet(sec);
-        return dl == null ? 0 : dl.get(bp.x & 15, bp.y & 15, bp.z & 15);
+        return dl == null ? 0 : dl.get(x & 15, y & 15, z & 15);
     }
 
-    private void setStoredLevel(long packedPos, int level) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
-        DataLayer dl = localGetOrCreate(sec, ChunkPos.asLong(bp.x >> 4, bp.z >> 4));
-        dl.set(bp.x & 15, bp.y & 15, bp.z & 15, level);
-        markAffected(packedPos);
+    private void setStoredLevel(int x, int y, int z, int level) {
+        long sec = secKeyOf(x, y, z);
+        DataLayer dl = localGetOrCreate(sec, ChunkPos.asLong(x >> 4, z >> 4));
+        dl.set(x & 15, y & 15, z & 15, level);
+        markAffected(x, y, z);
     }
 
     // ---- propagateIncrease (ported from SkyLightEngine L139-175) ----
 
-    private void propagateIncrease(long packedPos, long queueEntry, int lightLevel) {
+    private void propagateIncrease(int srcX, int srcY, int srcZ, long queueEntry, int lightLevel) {
         BlockState blockstate = null;
-        int emptyBelow = countEmptySectionsBelowIfAtBorder(packedPos);
-        IntBlockPos src = IntBlockPos.getBlockPos(packedPos);
+        int emptyBelow = countEmptySectionsBelowIfAtBorder(srcX, srcY, srcZ);
 
         for (Direction dir : PROPAGATION_DIRECTIONS) {
             if (!LightEngine.QueueEntry.shouldPropagateInDirection(queueEntry, dir)) continue;
 
-            // C2：内联 BlockPos.offset——复用 src（省 offset 内部反查 + 反查 nPos 两次 CHM.get）
-            int nbpX = src.x + dir.getStepX();
-            int nbpY = src.y + dir.getStepY();
-            int nbpZ = src.z + dir.getStepZ();
-            long nPos = HashUtil.hashPos((long) nbpX, (long) nbpY, (long) nbpZ);
-            HashUtil.putBlock(nPos, new IntBlockPos(nbpX, nbpY, nbpZ));
+            // C2：内联 BlockPos.offset——src 坐标直接来自队列，免反查
+            int nbpX = srcX + dir.getStepX();
+            int nbpY = srcY + dir.getStepY();
+            int nbpZ = srcZ + dir.getStepZ();
             long nSec = HashUtil.hashSection((long) (nbpX >> 4), (long) (nbpY >> 4), (long) (nbpZ >> 4));
-            DataLayer ndl = localGet(nSec); // 按需建层：先 get，需要写时才 getOrCreate（消除传播白建空层积累）
+            DataLayer ndl = localGet(nSec); // 按需建层：先 get，需要写时才 getOrCreate，消除传播白建空层积累
             int nVal = ndl == null ? 0 : ndl.get(nbpX & 15, nbpY & 15, nbpZ & 15);
 
             int reduced = lightLevel - 1;
             if (reduced <= nVal) continue;
 
             mutablePos.set(nbpX, nbpY, nbpZ);
-            BlockState bs1 = getState(mutablePos);
+            BlockState bs1 = getState(nbpX, nbpY, nbpZ);
             int afterOpacity = lightLevel - getOpacity(bs1, mutablePos);
             if (afterOpacity <= nVal) continue;
+
+            // P1：不再 putBlock 注册——传播队列存坐标，后续无 side-channel 反查；
+            // 白检查的格子本就不注册，现状 A' 已后移。
 
             if (blockstate == null) {
                 blockstate = LightEngine.QueueEntry.isFromEmptyShape(queueEntry)
                         ? Blocks.AIR.defaultBlockState()
-                        : getState(mutablePos.set(src.x, src.y, src.z));
+                        : getState(srcX, srcY, srcZ);
             }
 
-            // 形状检查跳过：仅当两方块都 isEmptyShape（getOcclusionShape 都返回
-            // empty，faceShapeOccludes=false）才跳过。注意不能只跳过来源空形状——目标
-            // 的真实面（台阶/条件方块 getFaceOcclusionShape 非空）会让 faceShapeOccludes
-            // 返回 true（遮挡），来源空形状跳过会错误放行（光穿过台阶）。
+            // 形状检查跳过：仅当两方块都 isEmptyShape，getOcclusionShape 都返回
+            // empty 且 faceShapeOccludes=false，才跳过。注意不能只跳过来源空形状——
+            // 目标的真实面如台阶/条件方块的 getFaceOcclusionShape 非空，会让
+            // faceShapeOccludes 返回 true 即遮挡，来源空形状跳过会错误放行，光穿过台阶。
             if (!(isEmptyShape(blockstate) && isEmptyShape(bs1))) {
-                if (shapeOccludes(packedPos, blockstate, nPos, bs1, dir)) continue;
+                if (shapeOccludes(srcX, srcY, srcZ, blockstate, nbpX, nbpY, nbpZ, bs1, dir)) continue;
             }
 
             if (ndl == null) {
                 ndl = localGetOrCreate(nSec, ChunkPos.asLong(nbpX >> 4, nbpZ >> 4));
             }
             ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, afterOpacity);
-            markAffected(nPos);
+            markAffected(nbpX, nbpY, nbpZ);
             if (afterOpacity > 1) {
-                enqueueIncrease(nPos, LightEngine.QueueEntry.increaseSkipOneDirection(
+                enqueueIncrease(nbpX, nbpY, nbpZ, LightEngine.QueueEntry.increaseSkipOneDirection(
                         afterOpacity, isEmptyShape(bs1), dir.getOpposite()));
             }
-            propagateFromEmptySections(nPos, dir, afterOpacity, true, emptyBelow);
+            propagateFromEmptySections(nbpX, nbpY, nbpZ, dir, afterOpacity, true, emptyBelow);
         }
     }
 
     // ---- propagateDecrease (ported from SkyLightEngine L178-199) ----
 
-    private void propagateDecrease(long packedPos, long lightLevel) {
-        int emptyBelow = countEmptySectionsBelowIfAtBorder(packedPos);
+    private void propagateDecrease(int srcX, int srcY, int srcZ, long lightLevel) {
+        int emptyBelow = countEmptySectionsBelowIfAtBorder(srcX, srcY, srcZ);
         int fromLevel = LightEngine.QueueEntry.getFromLevel(lightLevel);
-        IntBlockPos src = IntBlockPos.getBlockPos(packedPos);
 
         for (Direction dir : PROPAGATION_DIRECTIONS) {
             if (!LightEngine.QueueEntry.shouldPropagateInDirection(lightLevel, dir)) continue;
 
-            // C2：内联 BlockPos.offset——复用 src（省 offset 内部反查 + 反查 nPos 两次 CHM.get）
-            int nbpX = src.x + dir.getStepX();
-            int nbpY = src.y + dir.getStepY();
-            int nbpZ = src.z + dir.getStepZ();
-            long nPos = HashUtil.hashPos((long) nbpX, (long) nbpY, (long) nbpZ);
-            HashUtil.putBlock(nPos, new IntBlockPos(nbpX, nbpY, nbpZ));
+            // C2：内联 BlockPos.offset——src 坐标直接来自队列，免反查
+            int nbpX = srcX + dir.getStepX();
+            int nbpY = srcY + dir.getStepY();
+            int nbpZ = srcZ + dir.getStepZ();
             long nSec = HashUtil.hashSection((long) (nbpX >> 4), (long) (nbpY >> 4), (long) (nbpZ >> 4));
             if (!localContains(nSec)) continue;
 
@@ -422,13 +489,15 @@ taskLocal.clear(); // 批次入口
             int nVal = ndl.get(nbpX & 15, nbpY & 15, nbpZ & 15);
             if (nVal == 0) continue;
 
+            // P1：不再 putBlock 注册——队列存坐标，无 side-channel 反查
+
             if (nVal <= fromLevel - 1) {
                 ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, 0);
-                markAffected(nPos);
-                enqueueDecrease(nPos, LightEngine.QueueEntry.decreaseSkipOneDirection(nVal, dir.getOpposite()));
-                propagateFromEmptySections(nPos, dir, nVal, false, emptyBelow);
+                markAffected(nbpX, nbpY, nbpZ);
+                enqueueDecrease(nbpX, nbpY, nbpZ, LightEngine.QueueEntry.decreaseSkipOneDirection(nVal, dir.getOpposite()));
+                propagateFromEmptySections(nbpX, nbpY, nbpZ, dir, nVal, false, emptyBelow);
             } else {
-                enqueueIncrease(nPos, LightEngine.QueueEntry.increaseOnlyOneDirection(
+                enqueueIncrease(nbpX, nbpY, nbpZ, LightEngine.QueueEntry.increaseOnlyOneDirection(
                         nVal, false, dir.getOpposite()));
             }
         }
@@ -441,10 +510,10 @@ taskLocal.clear(); // 批次入口
         int x = bp.x, y = bp.y, z = bp.z;
         long secKey = HashUtil.hashSection((long) (x >> 4), (long) (y >> 4), (long) (z >> 4));
 
-        // vanilla 用 storage.lightOnInSection 门：无光源列（getLowestSourceY 返回
-        // MIN_VALUE）不 updateSourcesInColumn、按清光分支处理。我们无 columnsWithSources，
-        // 用 hasSource（!= MIN_VALUE）等价判断——否则 MIN_VALUE 会被 updateSourcesInColumn
-        // 传给 addSourcesAbove 从 int 边界填 15（全亮火把样）。
+        // vanilla 用 storage.lightOnInSection 门：无光源列即 getLowestSourceY 返回
+        // MIN_VALUE，不 updateSourcesInColumn、按清光分支处理。我们无 columnsWithSources，
+        // 用 hasSource 即 != MIN_VALUE 等价判断——否则 MIN_VALUE 会被 updateSourcesInColumn
+        // 传给 addSourcesAbove 从 int 边界填 15，全亮火把样。
         int lowestY = getLowestSourceY(x, z);
         boolean hasSource = lowestY != Integer.MIN_VALUE;
         if (hasSource) {
@@ -453,15 +522,15 @@ taskLocal.clear(); // 批次入口
 
         if (localContains(secKey)) {
             if (hasSource && y >= lowestY) {
-                enqueueDecrease(levelPos, REMOVE_SKY_SOURCE_ENTRY);
-                enqueueIncrease(levelPos, ADD_SKY_SOURCE_ENTRY);
+                enqueueDecrease(x, y, z, REMOVE_SKY_SOURCE_ENTRY);
+                enqueueIncrease(x, y, z, ADD_SKY_SOURCE_ENTRY);
             } else {
-                int cur = getStoredLevel(levelPos);
+                int cur = getStoredLevel(x, y, z);
                 if (cur > 0) {
-                    setStoredLevel(levelPos, 0);
-                    enqueueDecrease(levelPos, LightEngine.QueueEntry.decreaseAllDirections(cur));
+                    setStoredLevel(x, y, z, 0);
+                    enqueueDecrease(x, y, z, LightEngine.QueueEntry.decreaseAllDirections(cur));
                 } else {
-                    enqueueDecrease(levelPos, PULL_LIGHT_IN_ENTRY);
+                    enqueueDecrease(x, y, z, PULL_LIGHT_IN_ENTRY);
                 }
             }
         }
@@ -469,15 +538,14 @@ taskLocal.clear(); // 批次入口
 
     // ---- countEmptySectionsBelowIfAtBorder (ported from SkyLightEngine L201-226) ----
 
-    private int countEmptySectionsBelowIfAtBorder(long packedPos) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        int relY = bp.y & 15;
+    private int countEmptySectionsBelowIfAtBorder(int x, int y, int z) {
+        int relY = y & 15;
         if (relY != 0) return 0;
 
-        int relX = bp.x & 15, relZ = bp.z & 15;
+        int relX = x & 15, relZ = z & 15;
         if (relX != 0 && relX != 15 && relZ != 0 && relZ != 15) return 0;
 
-        int cx = bp.x >> 4, sy = bp.y >> 4, cz = bp.z >> 4;
+        int cx = x >> 4, sy = y >> 4, cz = z >> 4;
         int subRegion = sy >> 4;
         int bottomSY = subRegion * 16;
         int count = 0;
@@ -491,16 +559,14 @@ taskLocal.clear(); // 批次入口
 
     // ---- propagateFromEmptySections (ported from SkyLightEngine L228-263) ----
 
-    private void propagateFromEmptySections(long packedPos, Direction dir, int level,
+    private void propagateFromEmptySections(int x, int y, int z, Direction dir, int level,
                                             boolean increase, int emptySections) {
         if (emptySections == 0) return;
 
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        int x = bp.x, z = bp.z;
-        if (!crossedSectionEdge(dir, bp.x & 15, bp.z & 15)) return;
+        if (!crossedSectionEdge(dir, x & 15, z & 15)) return;
 
         int cx = x >> 4, cz = z >> 4;
-        int startSY = (bp.y >> 4) - 1;
+        int startSY = (y >> 4) - 1;
         int endSY = startSY - emptySections + 1;
 
         for (int sy = startSY; sy >= endSY; sy--) {
@@ -508,19 +574,18 @@ taskLocal.clear(); // 批次入口
             DataLayer dl = localGetOrCreate(secKey, ChunkPos.asLong(x >> 4, z >> 4));
             int blockY = sy << 4;
             for (int ry = 15; ry >= 0; ry--) {
-                long bPos = HashUtil.hashPos((long) x, (long) (blockY + ry), (long) z);
-                HashUtil.putBlock(bPos, new IntBlockPos(x, blockY + ry, z));
+                // P1：不 putBlock——队列存坐标，enqueue 直接带 (x, blockY+ry, z)
                 if (increase) {
                     dl.set(x & 15, ry, z & 15, level);
-                    markAffected(bPos);
+                    markAffected(x, blockY + ry, z);
                     if (level > 1) {
-                        enqueueIncrease(bPos, LightEngine.QueueEntry.increaseSkipOneDirection(
+                        enqueueIncrease(x, blockY + ry, z, LightEngine.QueueEntry.increaseSkipOneDirection(
                                 level, true, dir.getOpposite()));
                     }
                 } else {
                     dl.set(x & 15, ry, z & 15, 0);
-                    markAffected(bPos);
-                    enqueueDecrease(bPos, LightEngine.QueueEntry.decreaseSkipOneDirection(
+                    markAffected(x, blockY + ry, z);
+                    enqueueDecrease(x, blockY + ry, z, LightEngine.QueueEntry.decreaseSkipOneDirection(
                             level, dir.getOpposite()));
                 }
             }
@@ -577,16 +642,15 @@ taskLocal.clear(); // 批次入口
 
             DataLayer dl = storage.get(secKey);
             if (dl == null) continue;
-            affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 进入即标记（含提前 return 分支）
+            affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 进入即标记，含提前 return 分支
             int baseY = sy << 4;
             int topY = Math.min(baseY + 15, limitY);
 
             for (int by = topY; by >= baseY; by--) {
-                long bKey = HashUtil.hashPos((long) x, (long) by, (long) z);
-                HashUtil.putBlock(bKey, new IntBlockPos(x, by, z));
+                // P1：不 putBlock——enqueue 直接带坐标 (x, by, z)
                 if (!isSourceLevel(dl.get(x & 15, by - baseY, z & 15))) return;
                 dl.set(x & 15, by - baseY, z & 15, 0);
-                enqueueDecrease(bKey, by == minY - 1 ? REMOVE_TOP_SKY_SOURCE_ENTRY : REMOVE_SKY_SOURCE_ENTRY);
+                enqueueDecrease(x, by, z, by == minY - 1 ? REMOVE_TOP_SKY_SOURCE_ENTRY : REMOVE_SKY_SOURCE_ENTRY);
             }
         }
     }
@@ -609,19 +673,18 @@ taskLocal.clear(); // 批次入口
 
             DataLayer dl = storage.get(secKey);
             if (dl == null) continue;
-            affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 进入即标记（含提前 return 分支）
+            affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 进入即标记，含提前 return 分支
             int baseY = sy << 4;
             int topY = baseY + 15;
 
-            // long 化防溢出：topY = baseY + 15 在 2.14B（sy=MAX_CHUNK）时 = Integer.MAX_VALUE，
+            // long 化防溢出：topY = baseY + 15 在 2.14B 即 sy=MAX_CHUNK 时 = Integer.MAX_VALUE，
             // int by++ 溢出为负 → 无限循环 → DataLayer.get 越界 CTD。
             for (long by = Math.max((long) baseY, (long) effectiveMax); by <= topY; by++) {
-                long bKey = HashUtil.hashPos((long) x, by, (long) z);
-                HashUtil.putBlock(bKey, new IntBlockPos(x, (int) by, z));
+                // P1：不 putBlock——enqueue 直接带坐标 (x, by, z)
                 if (isSourceLevel(dl.get(x & 15, (int) by - baseY, z & 15))) return;
                 dl.set(x & 15, (int) by - baseY, z & 15, 15);
                 if (by < neighMin || by == maxY) {
-                    enqueueIncrease(bKey, ADD_SKY_SOURCE_ENTRY);
+                    enqueueIncrease(x, (int) by, z, ADD_SKY_SOURCE_ENTRY);
                 }
             }
         }
@@ -634,7 +697,7 @@ taskLocal.clear(); // 批次入口
         long chunkKey = ChunkPos.asLong(pos.x(), pos.z());
         if (isEmpty) {
             // 不删层：同 BlockLightEngine——checkNode 的 decrease 传播需要层在，
-            // 立即删层会导致相邻 section 光残留。空层随 chunk 卸载（removeChunk）清理。
+            // 立即删层会导致相邻 section 光残留。空层随 chunk 卸载由 removeChunk 清理。
         } else {
             getOrCreate(pos.asLong(), chunkKey);
         }
@@ -656,7 +719,7 @@ taskLocal.clear(); // 批次入口
         int cx = pos.x, cz = pos.z;
         ChunkSkyLightSources sources = java.util.Objects.requireNonNullElse(
                 getChunkSources(cx, cz), emptyChunkSources);
-        // 无光源（getHighestLowestSourceY 返回 MIN_VALUE，如未 fillFrom 的 LevelChunk）
+        // 无光源即 getHighestLowestSourceY 返回 MIN_VALUE，如未 fillFrom 的 LevelChunk
         // → 无区顶 15——否则 MIN_VALUE-1 溢出成 int max → 遍历垃圾 section 建层 fill 15。
         int highestLowest = sources.getHighestLowestSourceY();
         if (highestLowest == Integer.MIN_VALUE) return;
@@ -678,17 +741,86 @@ taskLocal.clear(); // 批次入口
 
     // ---- propagateLightSources (ported from SkyLightEngine L296-347) ----
 
+    /** 该 chunk 所有已建 section 是否全空，纯空气即全露天。 */
+    private static boolean isAllAir(WindowedChunk wc) {
+        for (LevelChunkSection s : wc.windowedAllSections().values()) {
+            if (s != null && !s.hasOnlyAir()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public void propagateLightSources(ChunkPos pos) {
         synchronized (queueLock) {
-            propagateLightSourcesLocked(pos);
+            propagateLightSourcesLocked(pos, false);
         }
     }
 
-    private void propagateLightSourcesLocked(ChunkPos pos) {
+    /** 重播专用，即 R1：只播 XZ 边界列，rx/rz in {0,15}——邻居 fillFrom 后方向位修正
+     * 只影响边界列，内部列邻居是本 chunk 内部，未变；边界列传播自然扩散内部。 */
+    public void propagateLightSourcesBoundary(ChunkPos pos) {
+        synchronized (queueLock) {
+            propagateLightSourcesLocked(pos, true);
+        }
+    }
+
+    // private boolean isSkyReady(int cx, int cz) {
+    //     LightChunk lc = getChunk(cx, cz);
+    //     if (lc == null) return false; // 未加载 = 未就绪 → 登记 waiter，加载后 fillFrom 触发重播做边界修正
+    //     ChunkSkyLightSources src = lc.getSkyLightSources();
+    //     if (src == null) return false; // 已加载未 initialize = fill 中
+    //     return src instanceof ISkyLightSourcesAccessor acc && acc.farlands$isFillFromDone();
+    // }
+
+    /**
+     * 邻居边界列光源高度分三态：未加载/空气即 fillFrom 完成无源 → MAX_VALUE，穿透，
+     * 方向位恒 true；fill 中即未 fillFrom → MIN_VALUE，保守，方向位 false，等邻居
+     * fillFrom 后触发重播修正；有源 → 实际 lowest。
+     */
+    private int neighborLowest(int cx, int cz, int localX, int localZ) {
+        LightChunk lc = getChunk(cx, cz);
+        if (lc == null) return Integer.MAX_VALUE; // 未加载 = 空气
+        ChunkSkyLightSources src = lc.getSkyLightSources();
+        if (src == null) return Integer.MIN_VALUE; // 已加载未 initialize = fill 中，保守
+        if (src instanceof ISkyLightSourcesAccessor acc && !acc.farlands$isFillFromDone()) {
+            return Integer.MIN_VALUE; // fill 中，保守
+        }
+        int lowest = src.getLowestSourceY(localX, localZ);
+        return lowest == Integer.MIN_VALUE ? Integer.MAX_VALUE : lowest; // 空气 → 穿透
+    }
+
+    /** 播种读邻居前登记"本 chunk 等 4 邻居"，邻居 fillFrom 后触发重播修正边界。
+     * 无条件登记，含已 fillFrom 就绪的邻居：就绪邻居的 fillFrom 后续变化，如新
+     * section 生成，同样需要重播本 chunk——否则邻居 fillFrom 二次变化时已播种 chunk
+     * 的边界光照停留在旧值，即窗口滑动邻 sec 光照不更新 bug。
+     * SKY_WAITERS 是 Set，同 chunk 反复登记去重；已卸载/未加载邻居触发空转无害。 */
+    private void registerSkyWaiters(int cx, int cz) {
+        long selfKey = ChunkPos.asLong(cx, cz);
+        FarLandsLightEngine.registerSkyWaiter(ChunkPos.asLong(cx, cz - 1), selfKey);
+        FarLandsLightEngine.registerSkyWaiter(ChunkPos.asLong(cx, cz + 1), selfKey);
+        FarLandsLightEngine.registerSkyWaiter(ChunkPos.asLong(cx - 1, cz), selfKey);
+        FarLandsLightEngine.registerSkyWaiter(ChunkPos.asLong(cx + 1, cz), selfKey);
+    }
+
+    private void propagateLightSourcesLocked(ChunkPos pos, boolean boundaryOnly) {
         int cx = pos.x, cz = pos.z;
 
         var lc = getChunk(cx, cz);
         if (lc instanceof WindowedChunk wc) {
+            if (isAllAir(wc)) {
+                // 纯空气 = 全露天：天空光全 15，无遮挡无衰减——vanilla 引擎对
+                // 无方块世界不播种，ChunkSkyLightSources 无光源 MIN_VALUE，
+                // 此处特判：全空 chunk 直接填 15 并通知 affectedSections
+                // → 服务端增量包 → 客户端 queueSectionData(15) → 亮。
+                for (int sy : wc.windowedAllSections().keySet()) {
+                    long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
+                    DataLayer dl = storage.getOrCreate(secKey, ChunkPos.asLong(cx, cz));
+                    dl.fill(15);
+                    affectedSections.add(SectionPos.asLong(cx, sy, cz));
+                }
+                return;
+            }
             for (int sy : wc.windowedAllSections().keySet()) {
                 int subRegion = sy >> 4;
                 int topSY = subRegion * 16 + 15;
@@ -696,19 +828,19 @@ taskLocal.clear(); // 批次入口
                     long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
                     // 注册 side-channel：getOrCreate 区顶逻辑内部反查 sp 依赖此条目，
                     // 否则 fallback 位解码垃圾坐标 → 区顶 fill 15 判断错误。
-                    HashUtil.putSection(secKey, new IntSectionPos(cx, sy, cz));
+                    HashUtil.putSection(secKey, cx, sy, cz);
                     getOrCreate(secKey, ChunkPos.asLong(cx, cz));
                 }
             }
         }
 
+        // 播种读 4 邻居边界列光源——fill 中邻居即未 fillFrom，方向位保守 → 边界短暂黑；
+        // 登记"本 chunk 等邻居"，邻居 fillFrom 后经 GenQueue.triggerLight 触发重播修正
+        registerSkyWaiters(cx, cz);
+
         setLightEnabled(pos, true);
 
         ChunkSkyLightSources s0 = java.util.Objects.requireNonNullElse(getChunkSources(cx, cz), emptyChunkSources);
-        ChunkSkyLightSources sN = java.util.Objects.requireNonNullElse(getChunkSources(cx, cz - 1), emptyChunkSources);
-        ChunkSkyLightSources sS = java.util.Objects.requireNonNullElse(getChunkSources(cx, cz + 1), emptyChunkSources);
-        ChunkSkyLightSources sW = java.util.Objects.requireNonNullElse(getChunkSources(cx - 1, cz), emptyChunkSources);
-        ChunkSkyLightSources sE = java.util.Objects.requireNonNullElse(getChunkSources(cx + 1, cz), emptyChunkSources);
 
         int bx = cx << 4, bz = cz << 4;
 
@@ -716,35 +848,86 @@ taskLocal.clear(); // 批次入口
         if (lc instanceof WindowedChunk wc2) {
             for (int sy : wc2.windowedAllSections().keySet()) {
                 long secKey = HashUtil.hashSection((long) cx, (long) sy, (long) cz);
-                // vanilla 语义：getDataLayerToWrite 创建层（传播初始化必须建层，
-                // 否则地表空层被跳过 → 最低光源处永不 enqueue → 传播无源 → 全黑）。
-                // 空层（全 0）留在 storage 也无害：该位置本就被遮挡（该黑）。
+                // vanilla 语义：getDataLayerToWrite 创建层，传播初始化必须建层，
+                // 否则地表空层被跳过 → 最低光源处永不 enqueue → 传播无源 → 全黑。
+                // 空层即全 0 留在 storage 也无害：该位置本就被遮挡，该黑。
                 DataLayer dl = storage.getOrCreate(secKey, ChunkPos.asLong(cx, cz));
-                affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 每 section 一次（渲染刷新粒度）
+                affectedSections.add(SectionPos.asLong(cx, sy, cz)); // 每 section 一次，渲染刷新粒度
 
                 int baseY = sy << 4;
                 int maxY = baseY + 15;
 
                 for (int rx = 0; rx < 16; rx++) {
                     for (int rz = 0; rz < 16; rz++) {
+                        // R1：重播只播边界列，方向位修正只影响边界，内部列邻居是本 chunk
+                        if (boundaryOnly && rx != 0 && rx != 15 && rz != 0 && rz != 15) {
+                            continue;
+                        }
                         int lowest0 = s0.getLowestSourceY(rx, rz);
-                        // 无光源列（MIN_VALUE，如未 fillFrom 的 LevelChunk）→ 不播种——
-                        // 否则 for 循环 max(baseY, MIN_VALUE)=baseY 填整个 section 15。
-                        if (lowest0 == Integer.MIN_VALUE || lowest0 > maxY) continue;
+                        if (lowest0 == Integer.MIN_VALUE) {
+                            // 露天列即 fillFrom 从最高到最低非空 section 该列无遮挡，真露天：
+                            // 天空直射 → 全 15。每层最低格 down 传播，下方 sec 若露天自己
+                            // 填 15，有遮挡则衰减进入；水平方向位与正常列同语义，by < lowestN 等。
+                            // B 优化：只 enqueue 边界格，by==baseY 向下 + by<neighborMin 水平
+                            // 阴影——其余格方向位全 false，by!=baseY && by>=neighborMin 时
+                            // 6 方向 shouldPropagate 全 false → 入队零扩散纯浪费。与非露天列对称。
+                            int lowestN = rz == 0 ? neighborLowest(cx, cz - 1, rx, 15) : s0.getLowestSourceY(rx, rz - 1);
+                            int lowestS = rz == 15 ? neighborLowest(cx, cz + 1, rx, 0) : s0.getLowestSourceY(rx, rz + 1);
+                            int lowestW = rx == 0 ? neighborLowest(cx - 1, cz, 15, rz) : s0.getLowestSourceY(rx - 1, rz);
+                            int lowestE = rx == 15 ? neighborLowest(cx + 1, cz, 0, rz) : s0.getLowestSourceY(rx + 1, rz);
+                            // L2：露天/未加载邻居，MIN=本 chunk 无源，MAX=跨 chunk 未加载/
+                            // 空气/露天，自己播种填 15 或加载后播种——本格水平传播冗余 →
+                            // 方向位 false + 不参与 neighborMin，塔顶全露天 seedCells ÷16。
+                            // L3：down 剪枝——下方 section 在本 chunk 播种循环内，keySet 含
+                            // sy-1 → 该列光照由下方自己播种处理，填 15，时序为播种先填全部
+                            // 再统一传播 → down 传播白检查跳过，冗余剪掉。下方 section 不存在
+                            // 即空/未创建 → down 保留，propagateFromEmptySections 穿行到遮挡处。
+                            // atLowest 即非露天列地表向下进地下不剪——地下光依赖传播，播种不填地表以下。
+                            boolean nOpen = lowestN == Integer.MIN_VALUE || lowestN == Integer.MAX_VALUE;
+                            boolean sOpen = lowestS == Integer.MIN_VALUE || lowestS == Integer.MAX_VALUE;
+                            boolean wOpen = lowestW == Integer.MIN_VALUE || lowestW == Integer.MAX_VALUE;
+                            boolean eOpen = lowestE == Integer.MIN_VALUE || lowestE == Integer.MAX_VALUE;
+                            boolean belowInSow = wc2.windowedAllSections().containsKey(sy - 1);
+                            for (int by = maxY; by >= baseY; by--) {
+                                dl.set(rx, by - baseY, rz, 15);
+                                boolean down = by == baseY && !belowInSow;
+                                boolean north = !nOpen && by < lowestN;
+                                boolean south = !sOpen && by < lowestS;
+                                boolean west = !wOpen && by < lowestW;
+                                boolean east = !eOpen && by < lowestE;
+                                if (down || north || south || west || east) {
+                                    // P1：不 putBlock——enqueue 直接带坐标，播种格不入 blockLookup
+                                    enqueueIncrease(bx + rx, by, bz + rz, LightEngine.QueueEntry.increaseSkySourceInDirections(
+                                            down, north, south, west, east));
+                                }
+                            }
+                            continue;
+                        }
+                        // 地表在更高处即 lowest0 > maxY → 本 section 该列由上方传播给光，不播种
+                        if (lowest0 > maxY) continue;
 
-                        int lowestN = rz == 0 ? sN.getLowestSourceY(rx, 15) : s0.getLowestSourceY(rx, rz - 1);
-                        int lowestS = rz == 15 ? sS.getLowestSourceY(rx, 0) : s0.getLowestSourceY(rx, rz + 1);
-                        int lowestW = rx == 0 ? sW.getLowestSourceY(15, rz) : s0.getLowestSourceY(rx - 1, rz);
-                        int lowestE = rx == 15 ? sE.getLowestSourceY(0, rz) : s0.getLowestSourceY(rx + 1, rz);
-                        int neighborMin = Math.max(Math.max(lowestN, lowestS), Math.max(lowestW, lowestE));
+                        int lowestN = rz == 0 ? neighborLowest(cx, cz - 1, rx, 15) : s0.getLowestSourceY(rx, rz - 1);
+                        int lowestS = rz == 15 ? neighborLowest(cx, cz + 1, rx, 0) : s0.getLowestSourceY(rx, rz + 1);
+                        int lowestW = rx == 0 ? neighborLowest(cx - 1, cz, 15, rz) : s0.getLowestSourceY(rx - 1, rz);
+                        int lowestE = rx == 15 ? neighborLowest(cx + 1, cz, 0, rz) : s0.getLowestSourceY(rx + 1, rz);
+                        // L2：同露天列分支——露天/未加载邻居水平位 false + 不参与 neighborMin；
+                        // atLowest 即 by==lowest0、地表向下进地下，保留。
+                        boolean nOpen = lowestN == Integer.MIN_VALUE || lowestN == Integer.MAX_VALUE;
+                        boolean sOpen = lowestS == Integer.MIN_VALUE || lowestS == Integer.MAX_VALUE;
+                        boolean wOpen = lowestW == Integer.MIN_VALUE || lowestW == Integer.MAX_VALUE;
+                        boolean eOpen = lowestE == Integer.MIN_VALUE || lowestE == Integer.MAX_VALUE;
 
                         for (int by = maxY; by >= Math.max(baseY, lowest0); by--) {
                             dl.set(rx, by - baseY, rz, 15);
-                            if (by == lowest0 || by < neighborMin) {
-                                long bKey = HashUtil.hashPos((long) (bx + rx), (long) by, (long) (bz + rz));
-                                HashUtil.putBlock(bKey, new IntBlockPos(bx + rx, by, bz + rz));
-                                enqueueIncrease(bKey, LightEngine.QueueEntry.increaseSkySourceInDirections(
-                                        by == lowest0, by < lowestN, by < lowestS, by < lowestW, by < lowestE));
+                            boolean atLowest = by == lowest0;
+                            boolean north = !nOpen && by < lowestN;
+                            boolean south = !sOpen && by < lowestS;
+                            boolean west = !wOpen && by < lowestW;
+                            boolean east = !eOpen && by < lowestE;
+                            if (atLowest || north || south || west || east) {
+                                // P1：不 putBlock——enqueue 直接带坐标
+                                enqueueIncrease(bx + rx, by, bz + rz, LightEngine.QueueEntry.increaseSkySourceInDirections(
+                                        atLowest, north, south, west, east));
                             }
                         }
                     }
@@ -775,26 +958,79 @@ taskLocal.clear(); // 批次入口
 
     // ==================== 方块访问 ====================
 
-    private BlockState getState(BlockPos pos) {
-        int cx = pos.getX() >> 4;
-        int cz = pos.getZ() >> 4;
-        LightChunk lc = getChunk(cx, cz);
-        return lc == null ? Blocks.BEDROCK.defaultBlockState() : lc.getBlockState(pos);
+    /** M3/O1/P5：任务入口清 section 缓存，包括 2-slot 与任务内缓存，防跨任务读旧 section。 */
+    private void clearSectionCache() {
+        this.lastSecX1 = Integer.MIN_VALUE;
+        this.lastSecY1 = Integer.MIN_VALUE;
+        this.lastSecZ1 = Integer.MIN_VALUE;
+        this.lastSec1 = null;
+        this.lastSecX2 = Integer.MIN_VALUE;
+        this.lastSecY2 = Integer.MIN_VALUE;
+        this.lastSecZ2 = Integer.MIN_VALUE;
+        this.lastSec2 = null;
+        this.taskSections.clear();
+        this.lastKx = Integer.MIN_VALUE; // N2：secKey 缓存哨兵重置
+    }
+
+    /** M3/O1：坐标版 getState + 2-slot section 缓存——传播调用点坐标已知，省 mutablePos +
+     * CHM.get 装箱。null section → BEDROCK 语义与 getChunk null → BEDROCK 一致。 */
+    private BlockState getState(int x, int y, int z) {
+        int sx = x >> 4, sy = y >> 4, sz = z >> 4;
+        LevelChunkSection s;
+        if (sx == this.lastSecX1 && sy == this.lastSecY1 && sz == this.lastSecZ1) {
+            s = this.lastSec1;
+        } else if (sx == this.lastSecX2 && sy == this.lastSecY2 && sz == this.lastSecZ2) {
+            s = this.lastSec2;
+        } else {
+            LightChunk lc = getChunk(sx, sz);
+            if (lc == null) {
+                return Blocks.BEDROCK.defaultBlockState();
+            }
+            // P5：先查任务内 section 缓存，fastutil 无装箱——CHM.get 只剩任务内首访
+            long secKey = HashUtil.hashSection((long) sx, (long) sy, (long) sz);
+            s = this.taskSections.get(secKey);
+            if (s == null) {
+                s = lc instanceof WindowedChunk wc ? wc.windowedAllSections().get(sy) : null;
+                if (s != null) { // 不缓存 null section，fastutil get null 有歧义且 null section 极少
+                    this.taskSections.put(secKey, s);
+                }
+            }
+            // LRU：旧 slot1 降级 slot2，新值进 slot1
+            this.lastSecX2 = this.lastSecX1;
+            this.lastSecY2 = this.lastSecY1;
+            this.lastSecZ2 = this.lastSecZ1;
+            this.lastSec2 = this.lastSec1;
+            this.lastSecX1 = sx;
+            this.lastSecY1 = sy;
+            this.lastSecZ1 = sz;
+            this.lastSec1 = s;
+        }
+        if (s != null) {
+            // N1：列掩码快路径——该行无方块即空气 → 直接 AIR 常量，免 palette 查找——
+            // 塔顶世界大部分格子空气，JFR getState 21.2%。columnMasksIfReady 不 rebuild：
+            // 懒创建空 section 掩码 null → 走 palette，防 ensure 扫 4096 格风暴。
+            short[] masks = ((com.inf.farlands.light.IColumnMasks) s).farlands$columnMasksIfReady();
+            if (masks != null && (masks[(x & 15) + (z & 15) * 16] & (1 << (y & 15))) == 0) {
+                return Blocks.AIR.defaultBlockState();
+            }
+            return s.getBlockState(x & 15, y & 15, z & 15);
+        }
+        return Blocks.BEDROCK.defaultBlockState();
     }
 
     private int getOpacity(BlockState state, BlockPos pos) {
         return Math.max(1, state.getLightBlock(chunkSource.getLevel(), pos));
     }
 
-    private boolean shapeOccludes(long pos1, BlockState state1, long pos2, BlockState state2, Direction dir) {
-        VoxelShape shape1 = getOcclusionShape(state1, pos1, dir);
-        VoxelShape shape2 = getOcclusionShape(state2, pos2, dir.getOpposite());
+    private boolean shapeOccludes(int x1, int y1, int z1, BlockState state1,
+            int x2, int y2, int z2, BlockState state2, Direction dir) {
+        VoxelShape shape1 = getOcclusionShape(state1, x1, y1, z1, dir);
+        VoxelShape shape2 = getOcclusionShape(state2, x2, y2, z2, dir.getOpposite());
         return Shapes.faceShapeOccludes(shape1, shape2);
     }
 
-    private VoxelShape getOcclusionShape(BlockState state, long pos, Direction dir) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(pos);
-        mutablePos.set(bp.x, bp.y, bp.z);
+    private VoxelShape getOcclusionShape(BlockState state, int x, int y, int z, Direction dir) {
+        mutablePos.set(x, y, z);
         return LightEngine.getOcclusionShape(chunkSource.getLevel(), mutablePos, state, dir);
     }
 }

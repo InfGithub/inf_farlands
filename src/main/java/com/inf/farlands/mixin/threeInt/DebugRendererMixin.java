@@ -15,10 +15,11 @@ import org.spongepowered.asm.mixin.Unique;
 /**
  * F3+G 三态循环：0=关、1=只世界盒、2=世界盒+区块线。
  *
- * vanilla 的 renderChunkborder（boolean，描述符 Z）字段不动（@Shadow 无法改
- * 类型），用 @Unique int chunkBorderState 做状态源；switchRenderChunkborder
- * 保持 boolean 签名（KeyboardHandler L179 的 flag1 接收，字节码零改动），
- * 内部三态循环，返回值只用于反馈消息 on/off（state 1/2 都显示 on，可接受）。
+ * vanilla 的 renderChunkborder 字段不动：它保持 boolean 类型、描述符 Z，
+ * 因为 @Shadow 无法改类型。用 @Unique int chunkBorderState 做状态源；
+ * switchRenderChunkborder 保持 boolean 签名：KeyboardHandler L179 的 flag1
+ * 接收，字节码零改动。内部三态循环，返回值只用于反馈消息 on/off：
+ * state 1/2 都显示 on，可接受。
  */
 @Mixin(DebugRenderer.class)
 public abstract class DebugRendererMixin {

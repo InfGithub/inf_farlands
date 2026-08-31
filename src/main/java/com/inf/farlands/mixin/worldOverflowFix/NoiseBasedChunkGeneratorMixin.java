@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.util.WorldBounds;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;

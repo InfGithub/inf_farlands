@@ -1,7 +1,7 @@
 package com.inf.farlands.mixin.axisY;
 
 import com.inf.farlands.InfFarlands;
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowedChunk;
 import com.inf.farlands.light.FarLandsLightEngine;
 import com.inf.farlands.light.FarLandsLightPacketData;
 
@@ -31,11 +31,11 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.protocol.PacketUtils;
 
 /**
- * priority = 100：Mixin 的 priority 数字越小越先应用（默认 1000）。本类
+ * priority = 100：Mixin 的 priority 数字越小越先应用，默认 1000。本类
  * 的 @Overwrite 必须先于 sodium 的 core.world.map.ClientPacketListenerMixin
- * 应用——sodium 的 handleForgetLevelChunk @Inject RETURN（ChunkTracker.
- * onChunkStatusRemoved）注入到我们的新方法体，卸载清理钩子保留（若 sodium
- * 先应用，其注入会被我们的 @Overwrite 整体覆盖而丢失）。
+ * 应用——sodium 的 handleForgetLevelChunk @Inject RETURN 注入
+ * ChunkTracker.onChunkStatusRemoved 到我们的新方法体，卸载清理钩子保留；
+ * 若 sodium 先应用，其注入会被我们的 @Overwrite 整体覆盖而丢失。
  */
 @Mixin(value = ClientPacketListener.class, priority = 100)
 public abstract class ClientPacketListenerMixin {
@@ -44,9 +44,9 @@ public abstract class ClientPacketListenerMixin {
     private ClientLevel level;
 
     /**
-     * 修复：标记实际有数据的 section（allSections），而非窗口数组。窗口是
-     * repositionCamera 维护的视图（渲染帧）；新 chunk 在此之前保持构造窗口
-     * （1 个 section），按窗口迭代会漏掉大部分 section。
+     * 修复：标记实际有数据的 section，即 allSections，而非窗口数组。窗口是
+     * repositionCamera 维护的视图，对应渲染帧；新 chunk 在此之前保持构造窗口，
+     * 只有 1 个 section，按窗口迭代会漏掉大部分 section。
      */
     @SuppressWarnings("null")
     @Overwrite
@@ -105,6 +105,9 @@ public abstract class ClientPacketListenerMixin {
         }
         final int[] ys = sectionYs;
 
+        // §5 缓存清理：chunk 卸载 → 丢弃未应用的 §5 数据，防残留堆积（按当前维度 key）
+        InfFarlands.discardPendingSectionData(this.level.dimension(), cpos);
+
         this.level.getChunkSource().drop(cpos);
 
         this.level.queueLightUpdate(() -> {
@@ -131,9 +134,9 @@ public abstract class ClientPacketListenerMixin {
     }
 
     /**
-     * 修复：标记实际有数据的 section（allSections），而非窗口数组。窗口是
-     * repositionCamera 维护的视图（渲染帧）；新 chunk 在此之前保持构造窗口
-     * （1 个 section），按窗口迭代会漏掉大部分 section。
+     * 修复：标记实际有数据的 section，即 allSections，而非窗口数组。窗口是
+     * repositionCamera 维护的视图，对应渲染帧；新 chunk 在此之前保持构造窗口，
+     * 只有 1 个 section，按窗口迭代会漏掉大部分 section。
      */
     @SuppressWarnings("null")
     @Overwrite
@@ -171,8 +174,11 @@ public abstract class ClientPacketListenerMixin {
             FarLandsLightPacketData fd = (FarLandsLightPacketData) FARLANDS_LIGHT_FIELD.get(packet);
             if (fd != null) fd.apply(fle, packet.getX(), packet.getZ());
         } catch (Exception e) {
-            // 不静默吞错（历史教训：catch ignored 掩盖 farlandsLightData 应用失败）
+            // 不静默吞错：catch ignored 会掩盖 farlandsLightData 应用失败
             InfFarlands.LOGGER.error("FLPKT apply EXCEPTION chunk={},{}", packet.getX(), packet.getZ(), e);
         }
+        // §5 补应用：chunk 加载完成，即 replaceWithPacketData 之后 → 应用此前因 chunk 未加载
+        // 而缓存的 §5 section 数据，防方块数据永久缺失——空缺/双端不同步。
+        InfFarlands.applyPendingSectionData(this.level.dimension(), packet.getX(), packet.getZ());
     }
 }

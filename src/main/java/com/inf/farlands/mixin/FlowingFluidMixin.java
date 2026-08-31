@@ -37,7 +37,7 @@ public class FlowingFluidMixin {
     private void onSpread(Level level, BlockPos pos, FluidState state, CallbackInfo ci) {
 
         if (Config.disableFluidSpread) {
-            ci.cancel(); // 检测是否禁用流体蔓延
+            ci.cancel();
         }
     }
 }

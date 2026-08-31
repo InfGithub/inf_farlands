@@ -22,7 +22,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 
 import com.inf.farlands.Config;
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowedChunk;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -67,18 +67,19 @@ public abstract class ViewAreaMixin {
         int spanY = this.sectionGridSizeY * 16;
         int spanZ = this.sectionGridSizeZ * 16;
 
-        // long 运算防极端坐标溢出：baseY 在 -2.14B 时 int 溢出（-2147483632-288 < MIN）→
-        // origin 垃圾 → 编译用 origin 推导错误 section → 放置方块不可见（dev/vanilla 路径）
+        // baseY 在 -2.14B 时 int 溢出：-2147483632-288 小于 MIN，origin 变垃圾 →
+        // 编译用 origin 推导错误 section → 放置方块不可见
         long baseX = (long) ix - 8 - spanX / 2;
         long baseY = (long) iy - 8 - spanY / 2;
         long baseZ = (long) iz - 8 - spanZ / 2;
 
         for (int kx = 0; kx < this.sectionGridSizeX; kx++) {
-            // origin 饱和到 int 边界（非可玩范围）：缓冲带 chunk（134217727，block
-            // 2147483632~2147483647，int 可表示）保留独立 origin → 独立渲染（空气），
-            // 不再折叠到 134217726；仅超 int 位置（2147483648+，不可表示）饱和到
-            // int max。setOrigin 的 AABB(x, x+16) 已 long 化（RenderSectionSetOriginMixin），
-            // relativeOrigins 的 ±16 溢出保留（超界方向 isInViewDistance 过滤，安全）。
+            // origin 饱和到 int 边界：缓冲带 chunk 坐标 134217727、block 坐标
+            // 2147483632~2147483647 均 int 可表示，保留独立 origin，独立渲染为空气，
+            // 不再折叠到 134217726；仅 2147483648+ 的不可表示位置饱和到 int max。
+            // setOrigin 的 AABB(x, x+16) 已 long 化，由 RenderSectionSetOriginMixin
+            // 实现；relativeOrigins 的 ±16 溢出保留，超界方向被 isInViewDistance
+            // 过滤，安全。
             int originX = saturateInt(baseX + Math.floorMod((long) kx * 16 - baseX, spanX));
 
             for (int kz = 0; kz < this.sectionGridSizeZ; kz++) {
@@ -97,9 +98,9 @@ public abstract class ViewAreaMixin {
             }
         }
 
-        // Z: 客户端窗口跟随相机 Y（区块线/视图始终在玩家周围）。
+        // Z: 客户端窗口跟随相机 Y。
         // 覆盖全部已加载 chunk：RenderChunk 编译快照取 windowSections，
-        // 非玩家 chunk 的窗口无人维护会塌缩到构造默认（1 section）→ 不渲染。
+        // 非玩家 chunk 的窗口无人维护会塌缩到构造默认的 1 section → 不渲染。
         // 每帧调用，buildWindow 早退保证窗口未变时零开销。
         if (camera != null) {
             int camSecY = Mth.floorDiv(Mth.floor(camera.getY()), 16);
@@ -110,14 +111,14 @@ public abstract class ViewAreaMixin {
                     LevelChunk chunk = (LevelChunk) this.level.getChunk(cx, cz, ChunkStatus.FULL, false);
                     if (chunk != null && !(chunk instanceof EmptyLevelChunk)) {
                         ((WindowedChunk) chunk).moveWindowTo(camSecY);
-                        discardOutsideHoldBoundary(chunk); // §7.3 滑出丢弃
+                        discardOutsideHoldBoundary(chunk);
                     }
                 }
             }
         }
     }
 
-    /** long → int 饱和（Java double→int 语义一致）：超界 origin 饱和到 int 边界，不截断。 */
+    /** long → int 饱和，语义与 Java double→int 一致：超界 origin 饱和到 int 边界，不截断。 */
     private static int saturateInt(long v) {
         return v > Integer.MAX_VALUE ? Integer.MAX_VALUE
                 : v < Integer.MIN_VALUE ? Integer.MIN_VALUE : (int) v;
@@ -145,12 +146,12 @@ public abstract class ViewAreaMixin {
     }
 
     /**
-     * §7.3 滑出丢弃（修订：丢弃参考 = 持有边界 ∪ 视图窗口并集）。
-     * 持有边界滞后于玩家窗口（无数据 chunk 不发 section 包、快速移动包延迟），
-     * 单独用它判定会把 view 内新数据误丢（实测 C4 证据）；view 每帧实时。
+     * 滑出丢弃：丢弃参考 = 持有边界与视图窗口并集。
+     * 持有边界滞后于玩家窗口：无数据 chunk 不发 section 包、快速移动包延迟，
+     * 单独用它判定会把 view 内新数据误丢；view 每帧实时。
      * 保护区间 = [min(hold, view)-2, max(hold, view)+2]，两者之外才丢。
-     * 空 section（懒创建产物）不丢——丢弃会触发光照查询再懒创建，形成每帧循环。
-     * 滑回由服务端 difference 重发（数据源 = 服务端内存，§8 闭环）。
+     * 空 section 不丢——丢弃会触发光照查询再懒创建，形成每帧循环。
+     * 滑回由服务端 difference 重发，数据源是服务端内存。
      */
     @SuppressWarnings("null")
     private void discardOutsideHoldBoundary(LevelChunk chunk) {

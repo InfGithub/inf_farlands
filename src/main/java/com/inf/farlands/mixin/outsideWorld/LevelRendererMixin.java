@@ -32,16 +32,16 @@ import com.mojang.blaze3d.platform.GlStateManager.DestFactor;
 /**
  * 六面体边界渲染：renderWorldBorder 六面体版。
  *
- * vanilla 四面板的 Y 顶点 = 相机 ± depthFar（跟随相机的 1280 格高墙）——XZ 墙在 Y 上
+ * vanilla 四面板的 Y 顶点 = 相机 ± depthFar，跟随相机的 1280 格高墙——XZ 墙在 Y 上
  * 无世界边界；地板/天花板不渲染。六面体版：
- * 1. XZ 四面板 Y 顶点 = [minY, maxY]（±(borderAbsoluteMax-16)，与 XZ 墙对齐，固定世界 Y 边界）
- * 2. 新增地板（y=minY）/天花板（y=maxY）面板（XZ 段 = 视距内）
- * 3. 触发条件/透明度三维化（到六面体最近面距离 < d0）
- * 4. floorSafe/ceilSafe 并入（Mth.floor/ceil int 溢出在 ±2.14B 边界）
+ * 1. XZ 四面板 Y 顶点 = [minY, maxY]，±(borderAbsoluteMax-16)，与 XZ 墙对齐，固定世界 Y 边界
+ * 2. 新增地板 y=minY / 天花板 y=maxY 面板，XZ 段 = 视距内
+ * 3. 触发条件/透明度三维化：到六面体最近面距离 < d0
+ * 4. floorSafe/ceilSafe 并入：Mth.floor/ceil int 溢出在 ±2.14B 边界
  * 5. outside=true → 不渲染
  *
- * float 精度安全：面板顶点 = 边界 - 相机（玩家靠近面板时差值小）；玩家距某面 > d0
- * 时该面在视锥外（触发条件保证），2^31 处 float 误差（<=128 格）不可见。
+ * float 精度安全：面板顶点 = 边界 - 相机，玩家靠近面板时差值小；玩家距某面 > d0
+ * 时该面在视锥外，触发条件保证，2^31 处 float 误差 <=128 格，不可见。
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
@@ -85,7 +85,7 @@ public abstract class LevelRendererMixin {
                 double camY = camera.getPosition().y;
                 double camZ = camera.getPosition().z;
 
-                // 触发条件（三维）：到六面体最近面距离 < d0
+                // 触发条件：到六面体最近面距离 < d0
                 double dXZ = Math.min(
                                 Math.min(camX - worldborder.getMinX(), worldborder.getMaxX() - camX),
                                 Math.min(camZ - worldborder.getMinZ(), worldborder.getMaxZ() - camZ));
@@ -123,13 +123,13 @@ public abstract class LevelRendererMixin {
                                 VertexFormat.Mode.QUADS,
                                 DefaultVertexFormat.POSITION_TEX);
 
-                // XZ 四面板竖直范围 = 视锥（±depthFar）∩ 世界 Y 边界：
-                // 玩家在 Y 中间时墙高 = 原版（1280 格，纹理密度正常）；靠近地板/天花板时
-                // 墙在边界截断（六面体闭合，不穿透）。V 保持原版 f4/f5 跨度（不拉伸）。
+                // XZ 四面板竖直范围 = 视锥 ±depthFar 与 世界 Y 边界：
+                // 玩家在 Y 中间时墙高 = 原版 1280 格，纹理密度正常；靠近地板/天花板时
+                // 墙在边界截断，六面体闭合不穿透。V 保持原版 f4/f5 跨度，不拉伸。
                 double yLo = Mth.clamp(camY - d4, minY, maxY);
                 double yHi = Mth.clamp(camY + d4, minY, maxY);
 
-                // ---- XZ 四面板（Y 顶点 = [yLo, yHi] 相对相机）----
+                // ---- XZ 四面板：Y 顶点 = [yLo, yHi] 相对相机 ----
                 double d5 = Math.max((double) floorSafe(camZ - d0), worldborder.getMinZ());
                 double d6 = Math.min((double) ceilSafe(camZ + d0), worldborder.getMaxZ());
                 float f6 = (float) (floorSafe(d5) & 1) * 0.5F;
@@ -223,7 +223,7 @@ public abstract class LevelRendererMixin {
                         }
                 }
 
-                // ---- 地板（y = minY）/ 天花板（y = maxY）面板 ----
+                // ---- 地板 y = minY / 天花板 y = maxY 面板 ----
                 double xLo = Math.max((double) floorSafe(camX - d0), worldborder.getMinX());
                 double xHi = Math.min((double) ceilSafe(camX + d0), worldborder.getMaxX());
                 double zLo = Math.max((double) floorSafe(camZ - d0), worldborder.getMinZ());

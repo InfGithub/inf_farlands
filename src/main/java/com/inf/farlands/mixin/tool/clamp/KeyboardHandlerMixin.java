@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** F3+K 触发钳制模式 toggle（客户端发请求，服务端校验 OP）。 */
+/** F3+K 触发钳制模式 toggle。客户端发请求，服务端校验 OP。 */
 @Mixin(KeyboardHandler.class)
 public class KeyboardHandlerMixin {
 

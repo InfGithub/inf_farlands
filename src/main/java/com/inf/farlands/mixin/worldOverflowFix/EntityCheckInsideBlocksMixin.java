@@ -14,18 +14,16 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 /**
- * #36 极端 XZ 投掷物（WitherSkull 等）冻结修复。
+ * 极端 XZ 投掷物如 WitherSkull 等的冻结修复。
  *
- * checkInsideBlocks 三层 for 循环边界 = BlockPos.containing(包围盒)（int 值域），
- * 实体在 ±2.14B 合法坐标时上界可达 Integer.MAX_VALUE（2147483647）→ int 递增
- * 溢出成 MIN_VALUE ≤ 上界 → 无限循环（与 #24 renderSnowAndRain 同构）。
- * Y 轴被 hasChunksAt 门保护（门开时上界 < MAX_VALUE，上界 = MAX_VALUE 时门关），
- * 冻结只发生 X/Z 轴。
+ * checkInsideBlocks 三层 for 循环边界 = BlockPos.containing(包围盒)，属 int 值域，
+ * 实体在 ±2.14B 合法坐标时上界可达 Integer.MAX_VALUE = 2147483647 → int 递增
+ * 溢出成 MIN_VALUE ≤ 上界 → 无限循环。Y 轴被 hasChunksAt 门保护，门开时上界
+ * < MAX_VALUE 而上界 = MAX_VALUE 时门关，冻结只发生 X/Z 轴。
  *
- * 修复：循环变量 long 化——起止点都是 BlockPos（int 值域），long 边界不溢出，
- * 循环按区间差值正常终止（正常包围盒几格，迭代次数不变；极端坐标 2-3 次）。
- * 体内 (int) 转换无损（i 值域 = [blockpos, blockpos1]，恒在 int 内）。
- * 逐行对照 vanilla（Entity.java:1027-1057），仅循环变量类型改变。
+ * 修复：循环变量 long 化——起止点都是 BlockPos，long 边界不溢出，循环按区间
+ * 差值正常终止；正常包围盒几格，迭代次数不变；极端坐标 2-3 次。
+ * 体内 (int) 转换无损——i 值域 = [blockpos, blockpos1]，恒在 int 内。
  */
 @Mixin(Entity.class)
 public abstract class EntityCheckInsideBlocksMixin {

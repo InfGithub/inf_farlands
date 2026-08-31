@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.Shadow;
 
 /**
  * 保证 lightEngine.close 一定执行：vanilla close 里 save(true) 抛异常/卡住会跳过
- * lightEngine.close → 光照线程池泄漏（多引擎累积）。try/finally 让 save 无论成败
+ * lightEngine.close → 光照线程池泄漏，多引擎会累积。try/finally 让 save 无论成败
  * 都关闭引擎与 chunkMap。
  */
 @Mixin(ServerChunkCache.class)

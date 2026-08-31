@@ -1,5 +1,8 @@
 package com.inf.farlands;
 
+import com.inf.farlands.window.WindowedChunk;
+import com.inf.farlands.terrain.pipeline.FarLandsGenState;
+
 import com.mojang.brigadier.CommandDispatcher;
 
 import net.minecraft.commands.CommandSourceStack;
@@ -10,6 +13,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
@@ -24,8 +28,8 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 
 /**
  * 诊断命令：/farlands section light dump —— 服务端 dump 玩家当前 section 的
- * sky/block 光照层全量矩阵 + 方块矩阵。op 权限。
- * 注意：本类不引用任何客户端类（dedicated server 加载）；客户端命令在
+ * sky/block 光照层全量矩阵 + 方块数据。op 权限。
+ * 注意：本类不引用任何客户端类，可被 dedicated server 加载；客户端命令在
  * ClientFarLandsCommands。
  */
 public class FarLandsCommands {
@@ -41,7 +45,13 @@ public class FarLandsCommands {
                                                 .executes(ctx -> dump(ctx.getSource()))))
                                 .then(Commands.literal("biome")
                                         .then(Commands.literal("dump")
-                                                .executes(ctx -> dumpBiomeCmd(ctx.getSource()))))));
+                                                .executes(ctx -> dumpBiomeCmd(ctx.getSource()))))
+                                .then(Commands.literal("block")
+                                        .then(Commands.literal("dump")
+                                                .executes(ctx -> dumpBlocksCmd(ctx.getSource()))))
+                                .then(Commands.literal("pipeline")
+                                        .then(Commands.literal("state")
+                                                .executes(ctx -> dumpPipelineState(ctx.getSource()))))));
     }
 
     @SuppressWarnings("null")
@@ -57,7 +67,6 @@ public class FarLandsCommands {
                     pos.getX(), pos.getY(), pos.getZ(), sec.x(), sec.y(), sec.z());
             dumpLayer(le, LightLayer.SKY, sec);
             dumpLayer(le, LightLayer.BLOCK, sec);
-            dumpBlocks(level, sec);
             source.sendSuccess(() -> Component.translatable("commands.inf_farlands.section.light.dump"), false);
         } catch (Exception e) {
             InfFarlands.LOGGER.error("FLDUMP server err", e);
@@ -82,7 +91,48 @@ public class FarLandsCommands {
         return 1;
     }
 
-    /** 当前 section 的 4x4x4 biome 网格（服务端/客户端共用）。 */
+    /** 方块数据独立命令：/farlands section block dump——light dump 不再包含方块数据。 */
+    @SuppressWarnings("null")
+    private static int dumpBlocksCmd(CommandSourceStack source) {
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            ServerLevel level = player.serverLevel();
+            BlockPos pos = player.blockPosition();
+            SectionPos sec = SectionPos.of(pos);
+            InfFarlands.LOGGER.info("BLOCKDUMP server pos={},{},{} sec={},{},{}",
+                    pos.getX(), pos.getY(), pos.getZ(), sec.x(), sec.y(), sec.z());
+            dumpBlocks(level, sec);
+            source.sendSuccess(() -> Component.translatable("commands.inf_farlands.section.block.dump"), false);
+        } catch (Exception e) {
+            InfFarlands.LOGGER.error("BLOCKDUMP server err", e);
+        }
+        return 1;
+    }
+
+    /** dump 玩家当前 chunk 的 per-section 生成状态，即 PLSTATE。 */
+    @SuppressWarnings("null")
+    private static int dumpPipelineState(CommandSourceStack source) {
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            ServerLevel level = player.serverLevel();
+            BlockPos pos = player.blockPosition();
+            ChunkPos cp = new ChunkPos(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+            InfFarlands.LOGGER.info("PLSTATE chunk={},{}", cp.x, cp.z);
+            ChunkAccess ca = level.getChunk(cp.x, cp.z, ChunkStatus.FULL, false);
+            if (ca instanceof LevelChunk lc) {
+                FarLandsGenState.forEachStage(lc, (sy, stage) ->
+                        InfFarlands.LOGGER.info("PLSTATE   secY={} stage={}", sy, stage));
+            } else {
+                InfFarlands.LOGGER.info("PLSTATE   chunk null");
+            }
+            source.sendSuccess(() -> Component.translatable("commands.inf_farlands.section.pipeline.state"), false);
+        } catch (Exception e) {
+            InfFarlands.LOGGER.error("PLSTATE err", e);
+        }
+        return 1;
+    }
+
+    /** 当前 section 的 4x4x4 biome 网格，服务端/客户端共用。 */
     @SuppressWarnings("null")
     public static void dumpBiomes(Level level, SectionPos sec) {
         try {
@@ -138,7 +188,7 @@ public class FarLandsCommands {
         }
     }
 
-    /** 方块矩阵（. = 空气，# = 非空气）——与光照矩阵对照，区分方块格 0（正常）与空气格 0（异常） */
+    /** 方块数据：. = 空气，# = 非空气——与光照矩阵对照，区分方块格的 0 为正常、空气格的 0 为异常 */
     @SuppressWarnings("null")
     public static void dumpBlocks(Level level, SectionPos sec) {
         try {

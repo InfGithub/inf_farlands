@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.axisY;
 
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.util.WorldBounds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelHeightAccessor;

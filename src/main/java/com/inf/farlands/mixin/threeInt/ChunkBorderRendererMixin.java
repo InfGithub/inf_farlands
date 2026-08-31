@@ -14,23 +14,30 @@ import net.minecraft.world.level.ChunkPos;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 自定义区块线（三层，粒度从粗到细）：
- * 蓝 3.0：玩家 3x3x3 section 的 16 格线框网格（48 条贯穿线，48x48x48 范围）
- * （跳过玩家 section 的 12 条棱——白层负责，避免同位置重叠 z-fighting 闪烁）
- * 红 4.0：玩家 section 所有面的 2 格刻度（2/6/10/14）
- * 黄 1.5：十字 7 section——中心 4 格步进（4/8/12），邻居 8 格步进（仅 8 处）
- * 白 5.5：玩家 section 的 12 条棱（立方体线框）
- * 粒度错开（蓝 16 / 红 2,6,10,14 / 黄 4,8,12）天然无重叠；
+ * 自定义区块线共三层，粒度从粗到细：
+ * 蓝 3.0：玩家 3x3x3 section 的 16 格线框网格，48 条贯穿线覆盖 48x48x48 范围。
+ * 跳过玩家 section 的 12 条棱，由白层负责，避免同位置重叠 z-fighting 闪烁。
+ * 红 4.0：玩家 section 所有面的 2 格刻度，位于 2/6/10/14 位置。
+ * 黄 1.5：十字 7 section——中心按 4/8/12 步进，邻居按 8 格步进且只有 8 处。
+ * 白 5.5：玩家 section 的 12 条棱，构成立方体线框。
+ * 粒度按蓝 16、红 2,6,10,14、黄 4,8,12 错开，天然无重叠；
  * 共享面/共享边 = 同一平面同一位置，重复画视觉重合，无需去重标志。
- * 坐标全为相对相机的 float 差值（block 坐标用 double 计算，
- * 极端 Y 下 secY*16+32 会溢出 int，double 全程规避）；每条线 4 顶点
- * （首尾重合 = GL_LINE_STRIP 退化线段断线，必须）。
+ * 坐标全为相对相机的 float 差值；block 坐标用 double 计算，
+ * 因为极端 Y 下 secY*16+32 会溢出 int，全程 double 规避。
+ * 每条线 4 顶点，首尾重合形成 GL_LINE_STRIP 退化线段断线，这是必须的。
  */
+// 与 Iris 的 MixinChunkBorderRenderer 冲突，其 @Redirect isCameraChunk/isSubChunkBorder
+// 会丢弃 vanilla 区块线特定线段：@Overwrite 会 merged 方法 → Iris 注入被拒/0 target →
+// MixinTransformerError CTD。改用 @Inject HEAD + cancel：方法不 merged → Iris 正常注入
+// 原版；运行时我们画三层区块线后 cancel 跳过原版，Iris 的抑制随之不执行，其锚定
+// vanilla 结构，与我们无关，无感。
 @Mixin(ChunkBorderRenderer.class)
 public class ChunkBorderRendererMixin implements WorldBoxRenderer {
 
@@ -38,13 +45,13 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
     @Final
     private Minecraft minecraft;
 
-    /** 十字形 7 个 section 偏移（相对玩家 section，section 单位）。 */
+    /** 十字形 7 个 section 偏移，相对玩家 section，以 section 为单位。 */
     @Unique
     private static final int[][] RED_OFFSETS = {
             { 0, 0, 0 }, { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 }
     };
 
-    /** 一条线 4 顶点 fade 模式（v0/v1 重合、v2/v3 重合 = 退化线段断线）。 */
+    /** 一条线 4 顶点 fade 模式，v0/v1 重合、v2/v3 重合即退化线段断线。 */
     @SuppressWarnings("null")
     @Unique
     private static void addLine(VertexConsumer consumer, Matrix4f m,
@@ -56,7 +63,7 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
         consumer.addVertex(m, x2, y2, z2).setColor(r, g, b, 0.0F);
     }
 
-    /** 渐变线：两端颜色不同，实际线段（v1→v2）颜色插值。 */
+    /** 渐变线：两端颜色不同，实际线段 v1→v2 的颜色插值。 */
     @SuppressWarnings("null")
     @Unique
     private static void addLineGradient(VertexConsumer consumer, Matrix4f m,
@@ -69,9 +76,9 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
     }
 
     /**
-     * 面内刻度网格：固定轴 axis（min 或 max 侧），另两轴以 step 步进画线。
-     * 不含面边界（0/16 位置由粗粒度层负责）；细粒度层（step < 4）跳过
-     * 粗粒度位置（黄跳过 4/8/12，红蓝负责）——粒度错开无重叠。
+     * 面内刻度网格：固定轴 axis 在 min 或 max 侧，另两轴以 step 步进画线。
+     * 不含面边界，0/16 位置由粗粒度层负责；细粒度层 step < 4 时跳过
+     * 粗粒度位置：黄跳过 4/8/12，红蓝负责——粒度错开无重叠。
      */
     @Unique
     private static void drawFaceGrid(VertexConsumer consumer, Matrix4f m,
@@ -103,8 +110,9 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
     }
 
     @SuppressWarnings("null")
-    @Overwrite
-    public void render(PoseStack poseStack, MultiBufferSource bufferSource, double camX, double camY, double camZ) {
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    private void farlands$render(PoseStack poseStack, MultiBufferSource bufferSource, double camX, double camY,
+            double camZ, CallbackInfo ci) {
         Entity entity = this.minecraft.gameRenderer.getMainCamera().getEntity();
         ChunkPos chunkpos = entity.chunkPosition();
         int secY = Mth.floorDiv(entity.getBlockY(), 16);
@@ -113,10 +121,10 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
         float fY0 = (float) ((double) secY * 16.0 - camY);
         Matrix4f matrix4f = poseStack.last().pose();
 
-        // ---- 蓝层（3.0）：3x3x3 section 线框，每段 16 格（132 段）----
-        // 只跳过中央 section 的 12 条棱段（白层 5.5 负责）——同位置重叠会 z-fighting 闪烁。
-        // 贯穿线按段拆分：格点 (dy,dz) 的 X 向线属于 3 个 section（sx ∈ {-1,0,1}），
-        // 跳过整条会误删邻居 section 的同格点棱（缺 8/12 的 bug），只跳过 sx==0 段。
+        // ---- 蓝层 3.0：3x3x3 section 线框，每段 16 格共 132 段 ----
+        // 只跳过中央 section 的 12 条棱段，由白层 5.5 负责——同位置重叠会 z-fighting 闪烁。
+        // 贯穿线按段拆分：格点 (dy,dz) 的 X 向线属于 sx in {-1,0,1} 的 3 个 section，
+        // 跳过整条会误删邻居 section 的同格点棱，导致缺 8/12 的 bug，只跳过 sx==0 段。
         VertexConsumer blue = bufferSource.getBuffer(RenderType.debugLineStrip(3.0));
         for (int dy = -1; dy <= 2; dy++) {
             for (int dz = -1; dz <= 2; dz++) {
@@ -158,14 +166,14 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
             }
         }
 
-        // ---- 红层（4.0）：玩家 section 所有面 2 格步进（2/6/10/14）----
+        // ---- 红层 4.0：玩家 section 所有面 2 格步进，位置 2/6/10/14 ----
         VertexConsumer red = bufferSource.getBuffer(RenderType.debugLineStrip(4.0));
         for (int axis = 0; axis < 3; axis++) {
             drawFaceGrid(red, matrix4f, f2, fY0, f3, axis, false, 2, 1.0F, 0.0F, 0.0F);
             drawFaceGrid(red, matrix4f, f2, fY0, f3, axis, true, 2, 1.0F, 0.0F, 0.0F);
         }
 
-        // ---- 黄层（1.5）：十字 7 section——中心 4 格步进（4/8/12），邻居 8 格步进（仅 8 处）----
+        // ---- 黄层 1.5：十字 7 section——中心 4 格步进即 4/8/12，邻居 8 格步进仅 8 处 ----
         VertexConsumer yellow = bufferSource.getBuffer(RenderType.debugLineStrip(1.5));
         for (int[] off : RED_OFFSETS) {
             int step = (off[0] == 0 && off[1] == 0 && off[2] == 0) ? 4 : 8;
@@ -178,7 +186,7 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
             }
         }
 
-        // ---- 白层（5.5）：玩家 section 的 12 条棱（立方体线框，蓝层已跳过同位置）----
+        // ---- 白层 5.5：玩家 section 的 12 条棱构成立方体线框，蓝层已跳过同位置 ----
         VertexConsumer white = bufferSource.getBuffer(RenderType.debugLineStrip(5.5));
         for (int dy = 0; dy <= 1; dy++) {
             float y = fY0 + dy * 16.0F;
@@ -201,16 +209,18 @@ public class ChunkBorderRendererMixin implements WorldBoxRenderer {
                 addLine(white, matrix4f, x, y, f3, x, y, f3 + 16.0F, 1.0F, 1.0F, 1.0F);
             }
         }
+        // 跳过原版区块线，其中含 Iris 注入的抑制逻辑——三层自定义网格已画完
+        ci.cancel();
     }
 
     /**
-     * 世界盒（RGB 渐变，pi 线宽）：位置比例盒，边长 256。
-     * 独立于区块线渲染（DebugRenderer 三态：state 1 只画世界盒、state 2 全画）。
-     * 顶点颜色 = 世界方向（R=(sx+1)/2, G=(sy+1)/2, B=(sz+1)/2）→ RGB 立方体，
-     * 棱上两端颜色插值渐变；颜色贴世界坐标（玩家移动不变色）。
-     * 8 顶点 = 盒中心 ± 128，盒中心 = cam − p×128（p = cam/MAX_BLOCK 归一化位置）
+     * 世界盒采用 RGB 渐变、pi 线宽：位置比例盒，边长 256。
+     * 独立于区块线渲染：DebugRenderer 三态中 state 1 只画世界盒、state 2 全画。
+     * 顶点颜色 = 世界方向 R=(sx+1)/2、G=(sy+1)/2、B=(sz+1)/2 → RGB 立方体，
+     * 棱上两端颜色插值渐变；颜色贴世界坐标，玩家移动不变色。
+     * 8 顶点 = 盒中心 ± 128，盒中心 = cam − p×128，p 为 cam/MAX_BLOCK 归一化位置
      * → 玩家在盒内位置 = 世界位置的比例映射，任何位置相对几何真实。
-     * 顶点相对相机 = 128×(±1 − p)，只依赖 p（与 cam 无关），值域 [−256, 256] float 精确。
+     * 顶点相对相机 = 128×(±1 − p)，只依赖 p 而与 cam 无关，值域 [−256, 256] float 精确。
      */
     @SuppressWarnings("null")
     @Override

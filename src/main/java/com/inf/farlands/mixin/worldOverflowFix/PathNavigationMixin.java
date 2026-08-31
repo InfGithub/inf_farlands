@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.util.WorldBounds;
 import com.inf.farlands.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -27,16 +27,10 @@ public class PathNavigationMixin {
     }
 
     /**
-     * mob 在维度最低高度（-64）以下任何入口寻路全 null。
+     * mob 在维度最低高度 -64 以下任何入口寻路全 null。
      *
-     * PathNavigation.createPath(Set,IZIF) L158 `mob.getY() <
-     * level.getMinBuildHeight()`
-     * ——维度范围 -64——负极端 Y（-65 ~ -2.14B，Config 允许范围）mob 无法寻路
-     * （实体/位置/随机全 null）。
-     *
-* 修复：@Redirect 该调用点 → Config.worldGenMinY（"维度高度边界 Config 化"）。
-     * javap 验证：createPath(Set,IZIF) 内 invokevirtual Level.getMinBuildHeight:()I
-     * 唯一 1 处（L158）。
+     * createPath(Set,IZIF) 的 mob.getY() < level.getMinBuildHeight() 检查——Config
+     * 允许的负极端 Y -65 ~ -2.14B 下 mob 无法寻路，实体/位置/随机全 null。
      */
     @Redirect(method = "createPath(Ljava/util/Set;IZIF)Lnet/minecraft/world/level/pathfinder/Path;", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;getMinBuildHeight()I"))
     private static int configWorldGenMinY(Level level) {

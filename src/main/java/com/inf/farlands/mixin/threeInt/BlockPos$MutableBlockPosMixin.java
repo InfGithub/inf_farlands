@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.threeInt;
 
-import com.inf.farlands.IntBlockPos;
+import com.inf.farlands.util.IntBlockPos;
 import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;

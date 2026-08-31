@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.axisYOverflowFix;
 
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowedChunk;
 import com.inf.farlands.network.FarLandsLightUpdatePacket;
 import com.inf.farlands.network.FarLandsSectionBlocksUpdatePacket;
 
@@ -44,13 +44,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class ChunkHolderMixin {
 
     /**
-     * 方块变化按「绝对 sectionY」记录（Map），广播时用绝对坐标 + 3int 编码。
-     * 这取代了 vanilla 的 changedBlocksPerSection 数组（其索引是 Level 的
-     * section 索引，极端 Y 越界；若改用窗口索引则与 broadcastChanges 的
-     * vanilla 解码错位，导致 sectionY 系统性偏移 -(windowMinY+4)——
-     * 表现为真树叶上方 112 格出现无法破坏的假树叶投影）。
+     * 方块变化按「绝对 sectionY」记录，广播时用绝对坐标 + 3int 编码。
+     * 取代 vanilla 的 changedBlocksPerSection 数组：其索引是 Level 的 section
+     * 索引，极端 Y 越界；若改用窗口索引则与 broadcastChanges 的 vanilla 解码
+     * 错位，导致 sectionY 系统性偏移 -(windowMinY+4)。
      *
-     * 批量路径发送 mod 自定义包 FarLandsSectionBlocksUpdatePacket（3int 编码），
+     * 批量路径以 3int 编码发送 mod 自定义包 FarLandsSectionBlocksUpdatePacket，
      * 因为 vanilla ClientboundSectionBlocksUpdatePacket 用 SectionPos.asLong()
      * 哈希编码，side-channel 是进程内的：客户端解码时 miss → 回退位解码 →
      * 极端 Y 截断。
@@ -58,7 +57,7 @@ public class ChunkHolderMixin {
     @Unique
     private final Map<Integer, ShortSet> changedSectionsMap = new HashMap<>();
 
-    /** 光照增量 affected section（绝对 sectionY）——sectionLightChanged @Inject 收集，broadcastChanges 消费。 */
+    /** 光照增量按绝对 sectionY 记录；sectionLightChanged @Inject 收集，broadcastChanges 消费。 */
     @Unique
     private final LongOpenHashSet affectedSkySections = new LongOpenHashSet();
 
@@ -108,9 +107,10 @@ public class ChunkHolderMixin {
     }
 
     /**
-     * 光照变化收集（绝对 sectionY，无范围限制）。vanilla 原方法用 BitSet 索引
-     * （sectionY - minLightSection，范围 [-5,21]）——极端 Y 会内存爆炸且被挡；
-     * 这里 @Inject RETURN 追加收集（原方法体完整执行：setUnsaved/ticking/范围检查）。
+     * 光照变化按绝对 sectionY 收集，无范围限制。vanilla 原方法以
+     * sectionY - minLightSection 作为 BitSet 索引，范围 [-5,21]，极端 Y 会
+     * 内存爆炸且被挡；这里 @Inject RETURN 追加收集，原方法体完整执行
+     * setUnsaved/ticking/范围检查。
      */
     @Inject(method = "sectionLightChanged", at = @At("RETURN"))
     private void collectLightSection(LightLayer type, int sectionY, CallbackInfo ci) {
@@ -135,10 +135,8 @@ public class ChunkHolderMixin {
         }
 
         Level level = chunk.getLevel();
-        // 光照增量：统一走自定义包 FarLandsLightUpdatePacket（绝对 sectionY，无范围限制）。
-        // vanilla ClientboundLightUpdatePacket 的 BitSet 索引在极端 Y 会内存爆炸且范围
-        // [-5,21] 挡掉极端 Y。BitSet filter 仍被 vanilla sectionLightChanged 填充，
-        // 这里无条件清空防残留。
+        // 光照增量：统一走自定义包 FarLandsLightUpdatePacket，按绝对 sectionY 编码、无范围限制。
+        // BitSet filter 仍被 vanilla sectionLightChanged 填充，这里无条件清空防残留。
         if (!this.affectedSkySections.isEmpty() || !this.affectedBlockSections.isEmpty()) {
             List<ServerPlayer> list = this.playerProvider.getPlayers(chunk.getPos(), true);
             if (!list.isEmpty()) {
@@ -190,7 +188,7 @@ public class ChunkHolderMixin {
                     idx++;
                 }
                 FarLandsSectionBlocksUpdatePacket pkt = new FarLandsSectionBlocksUpdatePacket(
-                        sectionpos, positions, states);
+                        level.dimension(), sectionpos, positions, states);
                 this.broadcast(players, new ClientboundCustomPayloadPacket(pkt));
                 pkt.runUpdates((p, st) -> this.broadcastBlockEntityIfNeeded(players, level, p, st));
             }
@@ -206,7 +204,7 @@ public class ChunkHolderMixin {
         ChunkPos cpos = chunk.getPos();
         List<FarLandsLightUpdatePacket.SectionLight> sky = buildLightLayer(cpos, LightLayer.SKY, this.affectedSkySections);
         List<FarLandsLightUpdatePacket.SectionLight> block = buildLightLayer(cpos, LightLayer.BLOCK, this.affectedBlockSections);
-        return new FarLandsLightUpdatePacket(cpos.x, cpos.z, sky, block);
+        return new FarLandsLightUpdatePacket(chunk.getLevel().dimension(), cpos.x, cpos.z, sky, block);
     }
     @SuppressWarnings({ "null" })
     @Unique

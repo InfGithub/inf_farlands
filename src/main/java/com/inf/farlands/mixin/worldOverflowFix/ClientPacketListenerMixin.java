@@ -1,7 +1,7 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.WindowedChunk;
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.window.WindowedChunk;
+import com.inf.farlands.util.WorldBounds;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -22,9 +22,9 @@ public class ClientPacketListenerMixin {
     @Shadow
     private ClientLevel level;
 
-    // §7.5：BlockUpdate 包接收校验——XZ 超界（现状）或 sectionY ∉ 客户端视图窗口
-    // （新增）→ 拒绝。窗口外数据写入后会被 §7.3 丢弃，源头拒绝更干净。
-    // 批量路径（vanilla 批量包 + 自定义包）不经过此处，由丢弃兜底（无循环风险）。
+    // BlockUpdate 包接收校验——XZ 超界或 sectionY 不在客户端视图窗口 → 拒绝。
+    // 窗口外数据写入后会被丢弃，源头拒绝更干净。
+    // vanilla 批量包 + 自定义包等批量路径不经过此处，由丢弃兜底，无循环风险。
     @SuppressWarnings("null")
     @Inject(method = "handleBlockUpdate", at = @At("HEAD"), cancellable = true)
     private void filterBlockUpdate(ClientboundBlockUpdatePacket packet, CallbackInfo ci) {

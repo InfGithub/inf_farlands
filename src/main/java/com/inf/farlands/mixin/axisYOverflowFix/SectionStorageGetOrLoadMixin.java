@@ -11,15 +11,13 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 /**
- * 极端 Y 放置 POI 方块（工作方块/床）时 PoiManager.add → getOrCreate → getOrLoad
- * 抛 IllegalStateException（L89）——getOrLoad 对该 section storage 无条目 →
- * readColumn（读磁盘）仍无 → 抛（vanilla 假设"维度范围内 readColumn 后必有条目"，
- * 我们的极端 Y section 无数据——readColumn 只预填充/恢复维度范围）。
- * 修复：throw → Optional.empty()——getOrCreate 收到 empty 后创建新 PoiSection
- * 并存储（POI 注册成功）。readColumn 保留（维度范围内已持久化 POI 的磁盘恢复
- * 不受影响）。
- * 新 mixin 而非并入 SectionStorageMixin：避免同类 @Shadow readColumn 与
- * @Overwrite readColumn 注解冲突（不同 mixin 类 @Shadow 被 @Overwrite 的方法可行）。
+ * 极端 Y 放置工作方块/床这类 POI 方块时，PoiManager.add → getOrCreate →
+ * getOrLoad 抛 IllegalStateException。getOrLoad 对该 section storage 无条目，
+ * readColumn 读磁盘后仍无条目——vanilla 假设维度范围内 readColumn 后必有条目，
+ * 而极端 Y section 无数据，readColumn 只预填充/恢复维度范围。
+ * 修复：throw 改为 Optional.empty()，getOrCreate 收到 empty 后创建新 PoiSection
+ * 并存储，POI 注册成功。readColumn 保留，维度范围内已持久化 POI 的磁盘恢复
+ * 不受影响。
  */
 @Mixin(SectionStorage.class)
 public abstract class SectionStorageGetOrLoadMixin {
@@ -47,7 +45,7 @@ public abstract class SectionStorageGetOrLoadMixin {
         }
         this.readColumn(SectionPos.of(sectionKey).chunk());
         optional = this.get(sectionKey);
-        // 原抛 IllegalStateException——极端 Y section 无数据 → 返回 empty（getOrCreate 创建新 section）
+        // 极端 Y section 无数据 → 返回 empty
         return optional == null ? Optional.empty() : optional;
     }
 }

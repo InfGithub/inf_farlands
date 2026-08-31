@@ -1,7 +1,7 @@
 package com.inf.farlands.mixin.server;
 
-import com.inf.farlands.WindowSendState;
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowSendState;
+import com.inf.farlands.window.WindowedChunk;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,12 +16,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 发送时刻的玩家窗口（取代 mark 时快照）。
+ * 发送时刻的玩家窗口取代 mark 时的快照。
  *
- * sendChunk 是 private static，每 chunk 调用一次（PlayerChunkSender
- * 按玩家独立持有队列）——HEAD 设置该玩家的窗口 minY，RETURN 清除。
+ * sendChunk 是 private static，每 chunk 调用一次，PlayerChunkSender
+ * 按玩家独立持有队列；HEAD 设置该玩家的窗口 minY，RETURN 清除。
  * extractChunkData 读 ThreadLocal 决定发送范围：多玩家各自窗口，
- * 且窗口 = 发送时刻的玩家 Y（比 mark 快照更实时）。
+ * 窗口 = 发送时刻的玩家 Y。
  */
 @Mixin(PlayerChunkSender.class)
 public class PlayerChunkSenderMixin {

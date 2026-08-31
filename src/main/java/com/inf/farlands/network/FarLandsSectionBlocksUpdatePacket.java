@@ -2,17 +2,29 @@ package com.inf.farlands.network;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.function.BiConsumer;
 
+/**
+ * 批量方块变化包（vanilla ClientboundSectionBlocksUpdatePacket 的自定义替代）。
+ *
+ * vanilla 包用 SectionPos.asLong()（3int 哈希）编码，side-channel 是进程内的：
+ * 服务端 putSection 在服务端进程，客户端解码 miss → 回退位解码 → 极端 Y 截断。
+ * 本包用 3int（writeInt×3）编码。
+ *
+ * 维度字段：同 FarLandsChunkDataPacket——tp 跨维度在途旧包由接收端按维度丢弃。
+ */
 public record FarLandsSectionBlocksUpdatePacket(
+        ResourceKey<Level> dimension,
         SectionPos sectionPos,
         short[] positions,
         BlockState[] states) implements CustomPacketPayload {
@@ -25,44 +37,8 @@ public record FarLandsSectionBlocksUpdatePacket(
             (buffer, pkt) -> pkt.writeTo(buffer),
             FarLandsSectionBlocksUpdatePacket::readFrom);
 
-    public FarLandsSectionBlocksUpdatePacket(ClientboundSectionBlocksUpdatePacket original) {
-        this(
-                reflectSectionPos(original),
-                reflectPositions(original),
-                reflectStates(original));
-    }
-
-    private static SectionPos reflectSectionPos(ClientboundSectionBlocksUpdatePacket pkt) {
-        try {
-            java.lang.reflect.Field f = ClientboundSectionBlocksUpdatePacket.class.getDeclaredField("sectionPos");
-            f.setAccessible(true);
-            return (SectionPos) f.get(pkt);
-        } catch (Exception e) {
-            return SectionPos.of(0, 0, 0);
-        }
-    }
-
-    private static short[] reflectPositions(ClientboundSectionBlocksUpdatePacket pkt) {
-        try {
-            java.lang.reflect.Field f = ClientboundSectionBlocksUpdatePacket.class.getDeclaredField("positions");
-            f.setAccessible(true);
-            return (short[]) f.get(pkt);
-        } catch (Exception e) {
-            return new short[0];
-        }
-    }
-
-    private static BlockState[] reflectStates(ClientboundSectionBlocksUpdatePacket pkt) {
-        try {
-            java.lang.reflect.Field f = ClientboundSectionBlocksUpdatePacket.class.getDeclaredField("states");
-            f.setAccessible(true);
-            return (BlockState[]) f.get(pkt);
-        } catch (Exception e) {
-            return new BlockState[0];
-        }
-    }
-
     public void writeTo(FriendlyByteBuf buffer) {
+        buffer.writeResourceKey(dimension);
         buffer.writeInt(sectionPos.x());
         buffer.writeInt(sectionPos.y());
         buffer.writeInt(sectionPos.z());
@@ -73,6 +49,7 @@ public record FarLandsSectionBlocksUpdatePacket(
     }
 
     public static FarLandsSectionBlocksUpdatePacket readFrom(FriendlyByteBuf buffer) {
+        ResourceKey<Level> dimension = buffer.readResourceKey(Registries.DIMENSION);
         SectionPos sp = SectionPos.of(buffer.readInt(), buffer.readInt(), buffer.readInt());
         int count = buffer.readVarInt();
         short[] pos = new short[count];
@@ -82,7 +59,7 @@ public record FarLandsSectionBlocksUpdatePacket(
             pos[i] = (short) ((int) (k & 4095L));
             st[i] = Block.BLOCK_STATE_REGISTRY.byId((int) (k >>> 12));
         }
-        return new FarLandsSectionBlocksUpdatePacket(sp, pos, st);
+        return new FarLandsSectionBlocksUpdatePacket(dimension, sp, pos, st);
     }
 
     @Override

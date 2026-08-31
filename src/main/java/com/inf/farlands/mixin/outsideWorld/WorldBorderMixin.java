@@ -12,14 +12,14 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 /**
- * 六面体边界（outsideWorld）：isInsideCloseToBorder 三维化（墙碰撞参与条件）。
+ * 六面体边界：isInsideCloseToBorder 三维化，墙碰撞参与条件。
  *
- * vanilla: getDistanceToBorder(entity)（XZ）< d0*2 && isWithinBounds(x, z,
+ * vanilla: getDistanceToBorder(entity) XZ < d0*2 && isWithinBounds(x, z,
  * d0)——实体靠近
- * Y 地板/天花板时碰撞不参与（Y 无边界）。三维版：min(XZ 距离, Y 距离) < d0*2 且
+ * Y 地板/天花板时碰撞不参与，Y 无边界。三维版：min(XZ 距离, Y 距离) < d0*2 且
  * y 在 [minY-d0, maxY+d0]。
  *
- * outside=true → false：XZ+Y 墙碰撞全关（所有实体可穿出）。shape 保持六面体不动。
+ * outside=true → false：XZ+Y 墙碰撞全关，所有实体可穿出。shape 保持六面体不动。
  */
 @Mixin(WorldBorder.class)
 public abstract class WorldBorderMixin {

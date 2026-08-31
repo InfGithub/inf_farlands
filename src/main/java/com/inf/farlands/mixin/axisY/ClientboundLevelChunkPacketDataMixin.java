@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.axisY;
 
-import com.inf.farlands.WindowSendState;
+import com.inf.farlands.window.WindowSendState;
 
 import java.util.List;
 import java.util.Map;

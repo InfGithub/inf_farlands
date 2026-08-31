@@ -5,7 +5,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-/** 服务端 → 客户端钳制模式状态同步（toggle 后发送，客户端据此钳制预测位置）。 */
+/** 服务端 → 客户端钳制模式状态同步：toggle 后发送，客户端据此钳制预测位置。 */
 public record FarLandsClampStatePacket(boolean enabled) implements CustomPacketPayload {
     @SuppressWarnings("null")
     public static final Type<FarLandsClampStatePacket> TYPE = new Type<>(

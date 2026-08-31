@@ -14,7 +14,6 @@
     "audioOverflowFix.PlayerMixin",
     "audioOverflowFix.SnifferSoundInstanceMixin",
     "audioOverflowFix.SoundEngineMixin",
-
     "axisY.ChunkAccessMixin",
     "axisY.ChunkGeneratorMixin",
     "axisY.ServerChunkCacheMixin",
@@ -22,6 +21,7 @@
     "axisY.ChunkMapMixin",
     "axisY.ChunkSerializerMixin",
     "light.ChunkSkyLightSourcesMixin",
+    "light.LevelChunkSectionMixin",
     "light.ClientChunkCacheLightEngineMixin",
     "axisY.ClientboundChunksBiomesPacket$ChunkBiomeDataMixin",
     "axisY.ClientboundLevelChunkPacketDataMixin",
@@ -31,10 +31,11 @@
     "axisY.LevelChunk$BoundTickingBlockEntityMixin",
     "axisY.LevelChunkMixin",
     "axisY.LevelHeightAccessorMixin",
+    "axisY.LevelShouldTickBlocksAtMixin",
     "axisY.NoiseBasedChunkGeneratorMixin",
     "axisY.ProtoChunkMixin",
     "axisY.ServerLevelMixin",
-
+    "axisY.ServerLevelSetBlockMixin",
     "axisYOverflowFix.ChunkHolderMixin",
     "axisYOverflowFix.ClientboundLevelChunkPacketData$BlockEntityInfoMixin",
     "axisYOverflowFix.ClientboundLevelChunkPacketDataMixin",
@@ -46,27 +47,23 @@
     "axisYOverflowFix.SectionStorageGetOrLoadMixin",
     "axisYOverflowFix.ServerGamePacketListenerImplMixin",
     "axisYOverflowFix.TheEndGatewayBlockEntityMixin",
-
     "compat.sodium.ClonedChunkSectionCacheMixin",
     "compat.sodium.LevelSliceMixin",
     "compat.sodium.OcclusionCullerMixin",
     "compat.sodium.RenderSectionManagerMixin",
-
-    "noise.NoiseBasedChunkGeneratorMixin",
+    "noise.HeightmapInvoker",
+    "noise.NoiseChunkInvoker",
     "noise.NoiseChunkMixin",
-
     "outsideWorld.GuiMixin",
     "outsideWorld.LevelRendererMixin",
     "outsideWorld.LivingEntityMixin",
     "outsideWorld.WorldBorder$StaticBorderExtentMixin",
     "outsideWorld.WorldBorderMixin",
-
     "worldOverflowFix.LevelRendererMixin",
     "render.RenderChunkMixin",
     "render.RenderSectionMixin",
     "render.SectionOcclusionGraphMixin",
     "render.ViewAreaMixin",
-
     "tool.clamp.BlockPlaceContextMixin",
     "tool.clamp.EntityCollisionMixin",
     "tool.clamp.EntityPickMixin",
@@ -74,9 +71,9 @@
     "tool.clamp.LevelRendererMixin",
     "tool.clamp.LocalPlayerMixin",
     "tool.clamp.ServerPlayerMixin",
-
     "server.PlayerChunkSenderMixin",
-
+    "serialize.LevelChunkSetBlockStateMixin",
+    "terrain.pipeline.GenerationChunkHolderMixin",
     "threeInt.Aquifer$NoiseBasedAquiferMixin",
     "threeInt.BlockPos$MutableBlockPosMixin",
     "threeInt.BlockPosMixin",
@@ -89,7 +86,6 @@
     "threeInt.PersistentEntitySectionManagerMixin",
     "threeInt.SectionPosMixin",
     "threeInt.SectionStorageMixin",
-
     "worldBorder.DedicatedServerMixin",
     "worldBorder.DimensionTypeMixin",
     "worldBorder.EntityMixin",
@@ -101,7 +97,6 @@
     "worldBorder.WorldBorder$SettingsMixin",
     "worldBorder.WorldBorderCommandMixin",
     "worldBorder.WorldBorderMixin",
-
     "worldOverflowFix.AABBMixin",
     "worldOverflowFix.BeaconBlockEntityMixin",
     "worldOverflowFix.BoundingBoxMixin",
@@ -134,12 +129,12 @@
     "worldOverflowFix.RenderSectionSetOriginMixin",
     "worldOverflowFix.ScatteredFeaturePieceMixin",
     "worldOverflowFix.StructureBlockEntityMixin",
+    "worldOverflowFix.SurfaceSystemMixin",
     "worldOverflowFix.VineBlockMixin",
     "worldOverflowFix.VoxelShapeMixin",
     "worldOverflowFix.WalkNodeEvaluatorMixin",
     "worldOverflowFix.WitherSkullBlockMixin",
     "worldOverflowFix.WorldGenRegionMixin",
-
     "FlowingFluidMixin"
   ],
   "injectors": {

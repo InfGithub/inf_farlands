@@ -2,8 +2,8 @@ package com.inf.farlands.light;
 
 import com.inf.farlands.Config;
 import com.inf.farlands.InfFarlands;
-import com.inf.farlands.IntSectionPos;
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.util.IntSectionPos;
+import com.inf.farlands.window.WindowedChunk;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
@@ -30,7 +30,9 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.LightChunk;
 import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.level.lighting.ChunkSkyLightSources;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 
 /**
@@ -42,9 +44,9 @@ import net.minecraft.world.level.lighting.LayerLightEventListener;
  * 引擎不使用——所有 public 方法都被覆写，委托给 {@link FarLandsSkyLightEngine} 与
  * {@link FarLandsBlockLightEngine}。
  *
- * <p>服务端并行：服务端构造（ChunkMap 版）启用 per-chunk 任务队列 +
- * 后台传播线程池 + per-chunk 锁（半径 2）+ light ticket（任务期间 chunk 不卸载）。
- * 主线程/生成线程只入队；客户端构造保持同步直调（渲染线程每帧 runLightUpdates）。
+ * <p>服务端并行：服务端构造即 ChunkMap 版启用 per-chunk 任务队列 +
+ * 后台传播线程池 + per-chunk 锁半径 2 + light ticket 保证任务期间 chunk 不卸载。
+ * 主线程/生成线程只入队；客户端构造保持同步直调，渲染线程每帧 runLightUpdates。
  * 双路径通过 {@code serverSide} 区分，客户端不受影响。
  */
 @SuppressWarnings({ "null" })
@@ -54,7 +56,90 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     final FarLandsBlockLightEngine blockEngine;
     final LightChunkGetter chunkSource;
 
-    // ---- 服务端并行（客户端为 null）----
+    /** 邻居 chunkKey → 播种时等它的 chunk 集合，邻居 fillFrom 后触发重播修正边界方向位。 */
+    private static final ConcurrentHashMap<Long, java.util.Set<Long>> SKY_WAITERS = new ConcurrentHashMap<>();
+
+    public static void registerSkyWaiter(long neighborKey, long waiterKey) {
+        SKY_WAITERS.computeIfAbsent(neighborKey, k -> ConcurrentHashMap.newKeySet()).add(waiterKey);
+    }
+
+    /** 本 chunk SkyLightSources fillFrom 完成 → 触发等待它的 chunk 重播，修正边界方向位。 */
+    public void onChunkSkySourcesReady(ChunkPos pos) {
+        java.util.Set<Long> waiters = SKY_WAITERS.remove(pos.toLong());
+        if (waiters == null) return;
+        for (long wk : waiters) {
+            // R1-B：pos 面向 waiter 的 16 边界列全露天，getLowestSourceY 全 MIN_VALUE →
+            // waiter 往 pos 的方向位与 fill 中相同，同为 MIN，属 L2 剪枝 → 重播无效果，跳过。
+            if (boundaryAllOpen(pos, wk)) {
+                continue;
+            }
+            enqueueLightSeeding(new ChunkPos(wk));
+        }
+    }
+
+    /** pos fillFrom 后面向 waiter 的边界列是否全露天，供 R1-B 跳过判定。 */
+    private boolean boundaryAllOpen(ChunkPos pos, long waiterKey) {
+        int cx = pos.x, cz = pos.z;
+        int wcx = ChunkPos.getX(waiterKey), wcz = ChunkPos.getZ(waiterKey);
+        LightChunk lc = chunkSource.getChunkForLighting(cx, cz);
+        if (lc == null) {
+            return false; // 保守：无法判断 → 重播
+        }
+        ChunkSkyLightSources src = lc.getSkyLightSources();
+        if (src == null) {
+            return false; // 保守处理：fill 中不触发本方法，fillFrom 完成才到，防御
+        }
+        if (wcz < cz) { // waiter 在北 → pos 的 z==15 列
+            for (int i = 0; i < 16; i++) {
+                if (src.getLowestSourceY(i, 15) != Integer.MIN_VALUE) {
+                    return false;
+                }
+            }
+        } else if (wcz > cz) { // waiter 在南 → pos 的 z==0 列
+            for (int i = 0; i < 16; i++) {
+                if (src.getLowestSourceY(i, 0) != Integer.MIN_VALUE) {
+                    return false;
+                }
+            }
+        } else if (wcx < cx) { // waiter 在西 → pos 的 x==15 列
+            for (int i = 0; i < 16; i++) {
+                if (src.getLowestSourceY(15, i) != Integer.MIN_VALUE) {
+                    return false;
+                }
+            }
+        } else { // waiter 在东 → pos 的 x==0 列
+            for (int i = 0; i < 16; i++) {
+                if (src.getLowestSourceY(0, i) != Integer.MIN_VALUE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** 播种任务，lightChunk 与邻居 fillFrom 触发的边界修正重播共用。 */
+    private void enqueueLightSeeding(ChunkPos pos) {
+        FarLandsLightQueue.ChunkWork tasks = queue.queueChunkLighting(pos, () -> {
+            // R1-A：重播只播 sky 边界列增量，因邻居 fillFrom 后方向位修正——block 光来自
+            // 方块发光、不受邻居 fillFrom 影响，跳过 block 播种/传播；边界列传播自然扩散内部。
+            FarLandsSkyLightEngine sky = getSkyForTask();
+            try {
+                if (skyEngine != null) {
+                    sky.propagateLightSourcesBoundary(pos);
+                    sky.runPropagation();
+                }
+            } finally {
+                releaseSky(sky);
+            }
+        });
+        // 必须 onEnqueued，它负责 addWorkRef + CHUNK_WORK_TICKET：executeTask 完成时
+        // 无条件 removeWorkRef，若重播不 add 会误扣同 chunk 在途 light 任务的 ticket
+        // 引用 → 保加载被抽 → 卸载竞态 → 光照损坏，这是"预加载区外光照全坏"的根因。
+        // 顺带唤醒后台调度，否则队列空闲时重播任务永不执行，边界修正丢失。
+        onEnqueued(tasks);
+    }
+
+    // ---- 服务端并行，客户端为 null ----
 
     private final boolean serverSide;
     private final FarLandsLightQueue queue;
@@ -85,7 +170,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         this.taskLock = new LightTaskLock();
         int parallelism = Config.parallelLightThreads;
         if (parallelism <= 0) {
-            // 0 = 自动：CPU 逻辑线程数的一半（min 1）
+            // 0 = 自动：CPU 逻辑线程数的一半，最小 1
             parallelism = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
         }
         this.lightPool = Executors.newFixedThreadPool(parallelism, r -> {
@@ -116,14 +201,14 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     @Override
     public void close() {
         if (lightPool != null) {
-            lightPool.shutdownNow(); // 强制中断，防池线程卡任务不退出（线程池泄漏）
+            lightPool.shutdownNow(); // 强制中断，防池线程卡任务不退出，线程池泄漏
         }
     }
 
     @Override
     protected void updateChunkStatus(ChunkPos pos) {
-        // 服务端/客户端一致：同步清理该 chunk 光照层（CHM 线程安全；与传播并发为
-        // 弱一致瞬态，重载/下次任务修正）。卸载不排队——chunk 即将卸载，ticket 无意义。
+        // 服务端/客户端一致：同步清理该 chunk 光照层，CHM 线程安全；与传播并发为
+        // 弱一致瞬态，重载/下次任务修正。卸载不排队——chunk 即将卸载，ticket 无意义。
         blockEngine.removeChunk(pos);
         if (skyEngine != null) skyEngine.removeChunk(pos);
     }
@@ -138,7 +223,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
             }
             CompletableFuture<ChunkAccess> result = new CompletableFuture<>();
             FarLandsLightQueue.ChunkWork tasks = queue.queueChunkLighting(pos, () -> {
-                // 播种（后台传播线程）
+                // 播种，后台传播线程执行
                 FarLandsSkyLightEngine sky = getSkyForTask();
                 FarLandsBlockLightEngine blk = getBlockForTask();
                 try {
@@ -146,8 +231,8 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
                     if (skyEngine != null) {
                         sky.propagateLightSources(pos);
                     }
-                    // 播种只 enqueue 光源，必须 propagate 才扩散（原同步模型靠每 tick
-                    // runLightUpdates 处理队列；任务模型里播种任务结束后无人处理）。
+                    // 播种只 enqueue 光源，必须 propagate 才扩散；原同步模型靠每 tick
+                    // runLightUpdates 处理队列，任务模型里播种任务结束后无人处理。
                     blk.runPropagation();
                     if (skyEngine != null) {
                         sky.runPropagation();
@@ -247,12 +332,27 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
 
     @Override
     public void queueSectionData(LightLayer layer, SectionPos pos, DataLayer data) {
+        long chunkKey = ChunkPos.asLong(pos.x(), pos.z());
         if (layer == LightLayer.BLOCK) {
-            if (data != null) blockEngine.setDataLayer(pos.asLong(), data, ChunkPos.asLong(pos.x(), pos.z()));
-            else blockEngine.updateSectionStatus(pos, true);
+            // null = 清空该 section 层（客户端卸载/丢弃/增量包清空信号）——必须真正删层，
+            // 不能走 updateSectionStatus(true)（其 no-op 是服务端 #66 decrease 传播语义，
+            // 层保留到 chunk 卸载；客户端清空路径依赖删层恢复 getLightValue 搜索/15）。
+            if (data != null) blockEngine.setDataLayer(pos.asLong(), data, chunkKey);
+            else blockEngine.removeDataLayer(pos.asLong(), chunkKey);
         } else if (skyEngine != null) {
-            if (data != null) skyEngine.setDataLayer(pos.asLong(), data, ChunkPos.asLong(pos.x(), pos.z()));
-            else skyEngine.updateSectionStatus(pos, true);
+            if (data != null) skyEngine.setDataLayer(pos.asLong(), data, chunkKey);
+            else skyEngine.removeDataLayer(pos.asLong(), chunkKey);
+        }
+    }
+
+    /** 移除某 section 的光照层，供 fsa 清理：section 滑出写盘后清引擎层，随 section 存走。 */
+    public void removeSectionData(LightLayer layer, SectionPos pos) {
+        long key = pos.asLong();
+        long chunkKey = ChunkPos.asLong(pos.x(), pos.z());
+        if (layer == LightLayer.BLOCK) {
+            blockEngine.removeDataLayer(key, chunkKey);
+        } else if (skyEngine != null) {
+            skyEngine.removeDataLayer(key, chunkKey);
         }
     }
 
@@ -261,7 +361,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         long key = pos.asLong();
         if (blockEngine.getDataLayer(key) != null) return true;
         if (skyEngine != null && skyEngine.getDataLayer(key) != null) return true;
-        // 兜底：chunk 已加载 = 可编译（幽灵块修复）
+        // 兜底：chunk 已加载 = 可编译，修复幽灵块
         IntSectionPos sp = IntSectionPos.getSectionPos(key);
         return chunkSource.getChunkForLighting(sp.x, sp.z) != null;
     }
@@ -283,7 +383,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         return blockEngine.getDataLayer(pos.asLong());
     }
 
-    // ==================== initializeLight（异步）====================
+    // ==================== initializeLight：异步 ====================
 
     @Override
     public CompletableFuture<ChunkAccess> initializeLight(ChunkAccess chunk, boolean lightEnabled) {
@@ -306,9 +406,9 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         var block = new Int2ObjectOpenHashMap<byte[]>();
         var lc = chunkSource.getChunkForLighting(pos.x, pos.z);
         // getChunkForLighting 可能返回 ChunkSerializer.read 的 ImposterProtoChunk——它的
-        // allSections 只含窗口 section（构造时从窗口视图转移），极端 Y section 数据在 wrapped
-        // LevelChunk（loadWindowSections 写入 ipc.getWrapped()）——必须解包取真实数据，否则
-        // 打包 0 层（重进极端 Y 光照黑）。
+        // allSections 只含窗口 section，构造时从窗口视图转移，极端 Y section 数据在 wrapped
+        // LevelChunk，loadWindowSections 写入 ipc.getWrapped()——必须解包取真实数据，否则
+        // 打包 0 层，重进极端 Y 光照黑。
         if (lc instanceof ImposterProtoChunk ipc) {
             lc = ipc.getWrapped();
         }
@@ -320,8 +420,8 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
             SectionPos sp = SectionPos.of(pos, sy);
             if (skyEngine != null) {
                 DataLayer sl = skyEngine.getDataLayer(sp.asLong());
-                // 层存在就发（含全 0 遮挡层）——只发非空层会让客户端无层，
-                // sky.getLightValue 无层返回 15 → 深地下（遮挡 0）全亮。
+                // 层存在就发，含全 0 遮挡层——只发非空层会让客户端无层，
+                // sky.getLightValue 无层返回 15 → 深地下遮挡为 0，全亮。
                 if (sl != null) sky.put(sy, sl.copy().getData());
             }
             DataLayer bl = blockEngine.getDataLayer(sp.asLong());
@@ -360,15 +460,22 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
 
     // ==================== 调度 / 池 / ticket ====================
 
+    /** P2：玩家位置变化 → 光照任务队列按距离重排，近的先处理；原 FIFO 远处先入队先处理。 */
+    public void rebuildLightQueue() {
+        if (queue != null) {
+            queue.rebuildQueue((ServerLevel) chunkSource.getLevel());
+        }
+    }
+
     /**
      * 后台调度激活标志——保证同时只有一个 drainLight 调度循环。
-     * 入队即唤醒（onEnqueued），任务完成不依赖主线程下一 tick（退出/保存等
+     * 入队即唤醒，onEnqueued 触发，任务完成不依赖主线程下一 tick，退出/保存等
      * 主线程忙循环场景下在途任务仍会完成，lightChunk future 落地，genRef 归零，
-     * scheduleUnload 递归自愈）。
+     * scheduleUnload 递归自愈。
      */
     private final AtomicBoolean consumerActive = new AtomicBoolean();
 
-    /** 唤醒后台调度循环（CAS 单例；已在跑则跳过）。 */
+    /** 唤醒后台调度循环，CAS 单例，已在跑则跳过。 */
     private void wakeConsumer() {
         if (consumerActive.compareAndSet(false, true)) {
             try {
@@ -380,10 +487,10 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
     }
 
     /**
-     * 后台调度循环（池线程，单例）。poll pendingWork → takeTask → tryLock →
-     * submit executeTask（执行仍在池线程，并行传播不退化）。循环到队列空；
+     * 后台调度循环运行在池线程，单例。poll pendingWork → takeTask → tryLock →
+     * submit executeTask，执行仍在池线程，并行传播不退化。循环到队列空；
      * 退出时 finally 重检 hasWork 再唤醒，闭合"退出瞬间入队"竞态。
-     * 锁冲突 requeue 回 FIFO 队尾（自然延迟）+ yield 防自旋。
+     * 锁冲突 requeue 回 FIFO 队尾，自然延迟 + yield 防自旋。
      */
     private void drainLight() {
         try {
@@ -394,7 +501,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
                 }
                 FarLandsLightQueue.ChunkWork tasks = queue.takeTask(key);
                 if (tasks == null) {
-                    continue; // 已被并发取走（takeTask 原子 remove），空转一次
+                    continue; // 已被并发取走，takeTask 原子 remove，空转一次
                 }
                 int cx = tasks.chunkX();
                 int cz = tasks.chunkZ();
@@ -413,7 +520,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         }
     }
 
-    /** 每 tick 调度入口：唤醒后台调度（限量 maxLightTasksPerTick 由后台消费替代）。 */
+    /** 每 tick 调度入口：唤醒后台调度，限量 maxLightTasksPerTick 由后台消费替代。 */
     private void scheduleTasks() {
         if (queue == null) {
             return;
@@ -452,9 +559,9 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
             taskLock.unlock(cx, cz);
             tasks.onComplete.complete(null);
             // 任务完成补唤醒：防 drainLight 单例漏调度——残留任务由在跑任务的
-            // 完成链式续接（light future 落地 → 生成继续 → getChunk 解除阻塞）
+            // 完成链式续接，light future 落地 → 生成继续 → getChunk 解除阻塞。
             wakeConsumer();
-            // ticket 移除必须主线程（ScalableLux：ticket 操作非线程安全）
+            // ticket 移除必须主线程，ScalableLux 的 ticket 操作非线程安全
             mainExecutor().execute(() -> {
                 if (queue.removeWorkRef(tasks.chunkKey) <= 0) {
                     ServerLevel level = (ServerLevel) chunkSource.getLevel();
@@ -466,7 +573,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         }
     }
 
-    /** 入队后加 light ticket（必须主线程；非主线程调用点如生成线程先回主线程）。 */
+    /** 入队后加 light ticket，必须主线程；非主线程调用点如生成线程先回主线程。 */
     private void onEnqueued(FarLandsLightQueue.ChunkWork tasks) {
         wakeConsumer(); // 入队即唤醒后台调度，不依赖主线程下一 tick
         if (tasks.isTicketAdded) {
@@ -510,7 +617,7 @@ public class FarLandsLightEngine extends ThreadedLevelLightEngine {
         }
     }
 
-    // ---- 引擎池（一任务一实例，共享 storage）----
+    // ---- 引擎池：一任务一实例，共享 storage ----
 
     private FarLandsSkyLightEngine getSkyForTask() {
         synchronized (skyPool) {

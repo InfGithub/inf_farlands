@@ -20,12 +20,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 留档项 #1 修复：/fillbiome 的体积检查（fill L124）同 XSpan int 溢出问题。
+ * /fillbiome 的体积检查同 XSpan int 溢出问题。
  *
- * 6 参重载（L113）精确描述符（method 名字匹配全部重载会错注入）——
- * 5 参重载（L108）内部委托 6 参，注入 6 参版即覆盖全部。
- * from/to 是 quantize 前原始坐标——阈值（单轴跨度 > GameRules limit）不受
- * quantize ±15 偏差影响（超 int 场景）。非 void 方法 → CallbackInfoReturnable。
+ * 6 参重载用精确描述符注入——method 名字匹配全部重载会错注入；
+ * 5 参重载内部委托 6 参，注入 6 参版即覆盖全部。
+ * from/to 是 quantize 前原始坐标——单轴跨度 > GameRules limit 的阈值不受
+ * quantize ±15 偏差影响。
  */
 @Mixin(FillBiomeCommand.class)
 public abstract class FillBiomeCommandMixin {

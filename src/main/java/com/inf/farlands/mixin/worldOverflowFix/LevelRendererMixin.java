@@ -26,21 +26,14 @@ import org.spongepowered.asm.mixin.Shadow;
 /**
  * 冻结修复：renderSnowAndRain 循环边界 long 化。
  *
- * vanilla L292-293：for (int j1 = k - l; j1 <= k + l; j1++)——k = floor(camZ)，
- * 玩家坐标 ±2.14B 下 k + l 恰好 = Integer.MAX_VALUE 时（k = 2147483637, l = 10），
- * j1 递增到 MAX_VALUE 后 j1++ 溢出为 MIN_VALUE → 无限循环（CPU 100% 冻结，
- * 实测 camZ=2147483637.84 触发）。修复：循环变量改 long 运算，j1/k1 在体内
- * 转 int（差值被 ±l 约束，int 转换无损）。其余逻辑与 vanilla 逐行一致。
+ * vanilla：for (int j1 = k - l; j1 <= k + l; j1++)，k = floor(camZ)，玩家坐标
+ * ±2.14B 下 k = 2147483637、l = 10 时 k + l 恰好 = Integer.MAX_VALUE，j1 递增
+ * 到 MAX_VALUE 后 j1++ 溢出为 MIN_VALUE → 无限循环，CPU 100% 冻结。
  *
- * 原版玩家坐标 ±3000 万不会触及该边界——本 mod 的 ±2.14B 坐标暴露了 vanilla
- * 边界 bug。
- *
- * priority = 100（后应用，实证：Mixin priority 越大越先应用）：sodium 的
- * features.options.weather.LevelRendererMixin（priority 1000）在 renderSnowAndRain
- * 内 @Redirect useFancyGraphics（天气质量选项）——@Overwrite 的方法带 merged
- * 标记，若我们先应用则 sodium 注入器拒绝注入 → sodium 应用失败 → 启动 CTD。
- * priority 100 < 1000 让我们后应用：sodium 先注入成功（vanilla 方法体），
- * 我们再 @Overwrite 覆盖（sodium 天气选项失效，功能损失可接受；修复完整保留）。
+ * 与 sodium 的 features.options.weather.LevelRendererMixin @Redirect useFancyGraphics
+ * 冲突：@Overwrite 的方法带 merged 标记，若我们先应用则 sodium 注入器拒绝注入 →
+ * sodium 应用失败 → 启动 CTD。priority = 100 使本 mixin 后应用，sodium 该 mixin
+ * priority 更低，先注入成功，我们再 @Overwrite 覆盖，sodium 天气选项失效。
  */
 @Mixin(value = LevelRenderer.class, priority = 100)
 public class LevelRendererMixin {
@@ -94,7 +87,7 @@ public class LevelRendererMixin {
             RenderSystem.setShader(GameRenderer::getParticleShader);
             BlockPos.MutableBlockPos blockpos$mutableblockpos = new BlockPos.MutableBlockPos();
 
-            // 修复：循环边界 long 运算防 j1++/k1++ 溢出死循环（k+l == MAX_VALUE 场景）
+            // k+l == MAX_VALUE 时 j1++/k1++ 溢出死循环，循环边界 long 化
             long j1Lo = (long) k - l;
             long j1Hi = (long) k + l;
             for (long j1L = j1Lo; j1L <= j1Hi; j1L++) {

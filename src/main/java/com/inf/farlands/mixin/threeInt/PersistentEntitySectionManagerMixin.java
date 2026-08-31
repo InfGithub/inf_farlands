@@ -1,8 +1,8 @@
 package com.inf.farlands.mixin.threeInt;
 
-import com.inf.farlands.EntitySectionWindow;
-import com.inf.farlands.IntSectionPos;
-import com.inf.farlands.ServerEntitySectionStorage;
+import com.inf.farlands.window.EntitySectionWindow;
+import com.inf.farlands.util.IntSectionPos;
+import com.inf.farlands.window.ServerEntitySectionStorage;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -35,9 +35,9 @@ import net.minecraft.world.level.entity.EntityPersistentStorage;
 public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess> {
 
     /**
-     * 服务端实体 section 存储标记——createSection 的窗口过滤仅服务端生效
-     * （客户端 TransientEntitySectionManager 也用 EntitySectionStorage，未标记则
-     * 不过滤——客户端实体必须持续 tick 插值，否则瞬移/鬼畜）。
+     * 服务端实体 section 存储标记——createSection 的窗口过滤仅服务端生效。
+     * 客户端 TransientEntitySectionManager 也用 EntitySectionStorage，未标记则
+     * 不过滤：客户端实体必须持续 tick 插值，否则瞬移/鬼畜。
      */
     @Inject(method = "<init>(Ljava/lang/Class;Lnet/minecraft/world/level/entity/LevelCallback;Lnet/minecraft/world/level/entity/EntityPersistentStorage;)V", at = @At("RETURN"))
     private void markStorageServerSide(Class<T> entityClass,
@@ -77,10 +77,10 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
     }
 
     /**
-     * 实体 section 状态窗口感知（与 vanilla 逐行一致 + 窗口过滤）。
-     * chunk 状态变化时遍历全部 sections——窗口外 section（不在任何玩家
-     * [secY−17, secY+16]）的 TICKING 降为 TRACKED：实体不 tick、保留
-     * accessible（碰撞/查询/交互）。窗口滑动由 InfFarlands 补触发本方法。
+     * 实体 section 状态窗口感知：与 vanilla 逐行一致，另加窗口过滤。
+     * chunk 状态变化时遍历全部 sections——不在任何玩家 [secY−17, secY+16]
+     * 内的窗口外 section 的 TICKING 降为 TRACKED：实体不 tick、保留
+     * accessible，即碰撞/查询/交互仍可用。窗口滑动由 InfFarlands 补触发本方法。
      */
     @SuppressWarnings({ "rawtypes", "unchecked", "null" })
     @Overwrite
@@ -111,7 +111,8 @@ public abstract class PersistentEntitySectionManagerMixin<T extends EntityAccess
             boolean oldTicking = old.isTicking();
             boolean newTicking = applied.isTicking();
             if (oldTicking && !newTicking) {
-                section.getEntities().filter(ent -> !ent.isAlwaysTicking()).forEach(this::stopTicking);
+                section.getEntities().filter(ent -> !ent.isAlwaysTicking())
+                    .forEach(this::stopTicking);
             }
             if (oldAccessible && !newAccessible) {
                 section.getEntities().filter(ent -> !ent.isAlwaysTicking()).forEach(this::stopTracking);

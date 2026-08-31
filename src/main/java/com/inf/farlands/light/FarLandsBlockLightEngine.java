@@ -1,11 +1,11 @@
 package com.inf.farlands.light;
 
-import com.inf.farlands.HashUtil;
-import com.inf.farlands.IntBlockPos;
-import com.inf.farlands.IntSectionPos;
+import com.inf.farlands.util.HashUtil;
+import com.inf.farlands.util.IntBlockPos;
+import com.inf.farlands.util.IntSectionPos;
+import com.inf.farlands.window.WindowedChunk;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
 import java.util.Map;
@@ -19,6 +19,7 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.LightChunk;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
@@ -42,12 +43,13 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
     private static final Direction[] PROPAGATION_DIRECTIONS = Direction.values();
 
     final FarLandsDataLayerStorage storage;
-    private final LongArrayFIFOQueue increaseQueue = new LongArrayFIFOQueue();
-    private final LongArrayFIFOQueue decreaseQueue = new LongArrayFIFOQueue();
+    // M1：LongRingQueue 只在 enqueue 时扩容、dequeue 不缩容——fastutil 扩-缩震荡 → JFR resize 269GB
+    private final LongRingQueue increaseQueue = new LongRingQueue(131072);
+    private final LongRingQueue decreaseQueue = new LongRingQueue(131072);
     final LongOpenHashSet blockNodesToCheck = new LongOpenHashSet(512, 0.5F);
     private final Object queueLock = new Object();
 
-    /** 传播写入影响的 section（对齐 vanilla sectionsAffectedByLightUpdates）——runLightUpdates 末尾通知。 */
+    /** 传播写入影响的 section，对齐 vanilla sectionsAffectedByLightUpdates，runLightUpdates 末尾通知。 */
     private final LongOpenHashSet affectedSections = new LongOpenHashSet();
 
     private final LightChunkGetter chunkSource;
@@ -55,8 +57,46 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
     private final long[] lastChunkKeys = new long[2];
     private final LightChunk[] lastChunks = new LightChunk[2];
 
-    // ---- 传播批次局部缓存：引用共享，纯读加速（省 CHM 装箱）。任务内单线程。----
-    private final Long2ObjectOpenHashMap<DataLayer> taskLocal = new Long2ObjectOpenHashMap<>();
+    // ---- 传播批次局部缓存：引用共享，纯读加速，省 CHM 装箱。任务内单线程。
+    // 预分配 1024，传播批次访问的 section 数可达几百，消 rehash；clear 保留数组复用。----
+    private final Long2ObjectOpenHashMap<DataLayer> taskLocal = new Long2ObjectOpenHashMap<>(1024);
+
+    // M3/O1：getState section 缓存用 2-slot LRU——垂直传播 A/B section 交替，1-slot 反复
+    // miss 装箱；2-slot 覆盖。任务入口清空，在 taskLocal.clear 处。
+    private int lastSecX1 = Integer.MIN_VALUE;
+    private int lastSecY1 = Integer.MIN_VALUE;
+    private int lastSecZ1 = Integer.MIN_VALUE;
+    private LevelChunkSection lastSec1;
+    private int lastSecX2 = Integer.MIN_VALUE;
+    private int lastSecY2 = Integer.MIN_VALUE;
+    private int lastSecZ2 = Integer.MIN_VALUE;
+    private LevelChunkSection lastSec2;
+
+    // P5：任务内 section 缓存，getState 2-slot miss 时查询——传播任务 section 集合有限，
+    // 首访后全命中，免 CHM.get(sy) 装箱+桶查。与 taskLocal 同生命周期，任务入口 clear。
+    private final Long2ObjectOpenHashMap<LevelChunkSection> taskSections =
+            new Long2ObjectOpenHashMap<>(128);
+
+    // N2：任务内 secKey 缓存，缓存 getStoredLevel/setStoredLevel 的 section key——传播链
+    // 格子连续同 section，命中率高，省 hashSection 纯计算。
+    private int lastKx = Integer.MIN_VALUE;
+    private int lastKy = Integer.MIN_VALUE;
+    private int lastKz = Integer.MIN_VALUE;
+    private long lastKeyVal;
+
+    /** N2：section key 计算 + 1-slot 缓存，同 section 连续命中省 hashSection。 */
+    private long secKeyOf(int x, int y, int z) {
+        int sx = x >> 4, sy = y >> 4, sz = z >> 4;
+        if (sx == this.lastKx && sy == this.lastKy && sz == this.lastKz) {
+            return this.lastKeyVal;
+        }
+        long k = HashUtil.hashSection((long) sx, (long) sy, (long) sz);
+        this.lastKx = sx;
+        this.lastKy = sy;
+        this.lastKz = sz;
+        this.lastKeyVal = k;
+        return k;
+    }
 
     private DataLayer localGet(long sec) {
         DataLayer dl = taskLocal.get(sec);
@@ -84,7 +124,7 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
         this(chunkSource, new FarLandsDataLayerStorage());
     }
 
-    /** 服务端共享 storage 构造（多个引擎实例共享同一仓库，供并行任务池化复用）。 */
+    /** 服务端共享 storage 构造，多个引擎实例共享同一仓库，供并行任务池化复用。 */
     FarLandsBlockLightEngine(LightChunkGetter chunkSource, FarLandsDataLayerStorage storage) {
         this.chunkSource = chunkSource;
         this.storage = storage;
@@ -102,6 +142,11 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
 
     public void checkBlock(BlockPos pos) {
         synchronized (queueLock) {
+            // P1：补注册 side-channel——checkNode 反查依赖；播种不再 putBlock 注册，
+            // 客户端 runLightUpdates 路径的 levelPos 无 asLong 注册，miss → 位解码垃圾坐标。
+            HashUtil.putBlock(HashUtil.hashPos(
+                    (long) pos.getX(), (long) pos.getY(), (long) pos.getZ()),
+                    pos.getX(), pos.getY(), pos.getZ());
             blockNodesToCheck.add(HashUtil.hashPos(
                     (long) pos.getX(), (long) pos.getY(), (long) pos.getZ()));
         }
@@ -119,23 +164,29 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
         storage.put(sectionKey, layer, chunkKey);
     }
 
+    /** 移除某 section 的光照层，供 fsa 清理使用。 */
+    public void removeDataLayer(long sectionKey, long chunkKey) {
+        storage.remove(sectionKey, chunkKey);
+    }
+
     // ==================== 服务端 per-chunk 任务入口 ====================
 
     /**
-     * 处理一个 chunk 的方块变化 + section 变化。任务独占本引擎实例（单线程），
-     * 队列/affectedSections 在任务内消耗。先建层（section 变化）再 checkNode。
+     * 处理一个 chunk 的方块变化 + section 变化。任务独占本引擎实例，单线程执行，
+     * 队列/affectedSections 在任务内消耗。先建层处理 section 变化，再 checkNode。
      */
     public void processBlocksChanged(int chunkX, int chunkZ, Set<BlockPos> positions,
             Map<Integer, Boolean> sectionChanges) {
         taskLocal.clear(); // 批次入口
-        blockNodesToCheck.clear(); // 防池化复用残留（任务路径不经 blockNodesToCheck）
+        clearSectionCache(); // M3 任务入口
+        blockNodesToCheck.clear(); // 防池化复用残留，任务路径不经 blockNodesToCheck
         if (sectionChanges != null) {
             for (Map.Entry<Integer, Boolean> e : sectionChanges.entrySet()) {
                 updateSectionStatus(SectionPos.of(chunkX, e.getKey(), chunkZ), e.getValue());
             }
         }
         for (BlockPos pos : positions) {
-            // 必须用 asLong()（会 putBlock 注册 side-channel）——直接 hashPos 会 miss，
+            // 必须用 asLong()，它会 putBlock 注册 side-channel——直接 hashPos 会 miss，
             // 传播链反查位解码垃圾坐标 → 光照写错位置 → 损坏。
             checkNode(pos.asLong());
         }
@@ -144,17 +195,18 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
 
     /**
      * 处理传播队列 + 通知。方块变化任务与播种任务共用——propagateLightSources 只
-     * enqueue 光源，必须经本方法 propagate 才扩散（原同步模型靠每 tick runLightUpdates）。
+     * enqueue 光源，必须经本方法 propagate 才扩散；原同步模型靠每 tick runLightUpdates。
      */
     public void runPropagation() {
         taskLocal.clear(); // 批次入口；播种后传播
+        clearSectionCache(); // M3 任务入口
         propagateDecreases();
         propagateIncreases();
         clearChunkCache();
         notifyLightChanges();
     }
 
-    /** 服务端 chunk 卸载清理：按索引移除该 chunk 全部光照层（O(sections/chunk)）。 */
+    /** 服务端 chunk 卸载清理：按索引移除该 chunk 全部光照层，O(sections/chunk)。 */
     public void removeChunk(ChunkPos pos) {
         storage.removeChunk(ChunkPos.asLong(pos.x, pos.z));
     }
@@ -170,6 +222,7 @@ public class FarLandsBlockLightEngine implements LayerLightEventListener {
     public int runLightUpdates() {
         synchronized (queueLock) {
 taskLocal.clear(); // 批次入口
+clearSectionCache(); // M3 任务入口
             var it = blockNodesToCheck.iterator();
             while (it.hasNext()) checkNode(it.nextLong());
             blockNodesToCheck.clear();
@@ -184,15 +237,15 @@ taskLocal.clear(); // 批次入口
         }
     }
 
-    // ==================== affected-section 通知（对齐 vanilla swapSectionMap → onLightUpdate）====================
+    // ==================== affected-section 通知：对齐 vanilla swapSectionMap → onLightUpdate ====================
 
-    /** 写入影响 block 周围所有 section（对齐 vanilla setStoredLevel 的 aroundAndAtBlockPos）。 */
-    private void markAffected(long packedPos) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        SectionPos.aroundAndAtBlockPos(bp.x, bp.y, bp.z, affectedSections::add);
+    /** 写入影响 block 周围所有 section，对齐 vanilla setStoredLevel 的 aroundAndAtBlockPos。
+     * 传坐标，因为调用点已知 x/y/z，省 IntBlockPos.getBlockPos 反查，是传播 get 的优化。 */
+    private void markAffected(int x, int y, int z) {
+        SectionPos.aroundAndAtBlockPos(x, y, z, affectedSections::add);
     }
 
-    /** 传播后通知（服务端 → sectionLightChanged → 增量包；客户端 → setSectionDirty 渲染刷新）。 */
+    /** 传播后通知，服务端走 sectionLightChanged 发增量包，客户端走 setSectionDirty 刷新渲染。 */
     private void notifyLightChanges() {
         if (affectedSections.isEmpty()) {
             return;
@@ -200,7 +253,7 @@ taskLocal.clear(); // 批次入口
         for (long key : affectedSections) {
             IntSectionPos sp = HashUtil.getSection(key);
             if (sp == null) {
-                continue; // 无 side-channel 条目（标记点漏 putSection）→ 跳过防垃圾坐标
+                continue; // 无 side-channel 条目，说明标记点漏 putSection → 跳过防垃圾坐标
             }
             chunkSource.onLightUpdate(LightLayer.BLOCK, SectionPos.of(sp.x, sp.y, sp.z));
         }
@@ -211,17 +264,20 @@ taskLocal.clear(); // 批次入口
 
     private int propagateIncreases() {
         int i;
-        for (i = 0; increaseQueue.size() >= 2; i++) {
-            long pos = increaseQueue.dequeueLong();
+        // 队列条目 4-long 即 x,y,z,entry——坐标随条目走，传播免 side-channel 反查，即 P1
+        for (i = 0; increaseQueue.size() >= 4; i++) {
+            int x = (int) increaseQueue.dequeueLong();
+            int y = (int) increaseQueue.dequeueLong();
+            int z = (int) increaseQueue.dequeueLong();
             long entry = increaseQueue.dequeueLong();
-            int cur = getStoredLevel(pos);
+            int cur = getStoredLevel(x, y, z);
             int fromEntry = LightEngine.QueueEntry.getFromLevel(entry);
             if (LightEngine.QueueEntry.isIncreaseFromEmission(entry) && cur < fromEntry) {
-                setStoredLevel(pos, fromEntry);
+                setStoredLevel(x, y, z, fromEntry);
                 cur = fromEntry;
             }
             if (cur == fromEntry) {
-                propagateIncrease(pos, entry, cur);
+                propagateIncrease(x, y, z, entry, cur);
             }
         }
         return i;
@@ -229,42 +285,47 @@ taskLocal.clear(); // 批次入口
 
     private int propagateDecreases() {
         int i;
-        for (i = 0; decreaseQueue.size() >= 2; i++) {
-            long pos = decreaseQueue.dequeueLong();
+        for (i = 0; decreaseQueue.size() >= 4; i++) {
+            int x = (int) decreaseQueue.dequeueLong();
+            int y = (int) decreaseQueue.dequeueLong();
+            int z = (int) decreaseQueue.dequeueLong();
             long entry = decreaseQueue.dequeueLong();
-            propagateDecrease(pos, entry);
+            propagateDecrease(x, y, z, entry);
         }
         return i;
     }
 
-    void enqueueIncrease(long pos, long entry) {
-        increaseQueue.enqueue(pos);
+    void enqueueIncrease(int x, int y, int z, long entry) {
+        increaseQueue.enqueue(x);
+        increaseQueue.enqueue(y);
+        increaseQueue.enqueue(z);
         increaseQueue.enqueue(entry);
     }
 
-    void enqueueDecrease(long pos, long entry) {
-        decreaseQueue.enqueue(pos);
+    void enqueueDecrease(int x, int y, int z, long entry) {
+        decreaseQueue.enqueue(x);
+        decreaseQueue.enqueue(y);
+        decreaseQueue.enqueue(z);
         decreaseQueue.enqueue(entry);
     }
 
     // ==================== 存储读写 ====================
+    // 改传坐标，即 P1：调用点传播队列/checkNode 处坐标已知——免 side-channel 反查。
 
-    private int getStoredLevel(long packedPos) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
+    private int getStoredLevel(int x, int y, int z) {
+        long sec = secKeyOf(x, y, z);
         DataLayer dl = localGet(sec);
-        return dl == null ? 0 : dl.get(bp.x & 15, bp.y & 15, bp.z & 15);
+        return dl == null ? 0 : dl.get(x & 15, y & 15, z & 15);
     }
 
-    private void setStoredLevel(long packedPos, int level) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
-        DataLayer dl = localGetOrCreate(sec, ChunkPos.asLong(bp.x >> 4, bp.z >> 4));
-        dl.set(bp.x & 15, bp.y & 15, bp.z & 15, level);
-        markAffected(packedPos);
+    private void setStoredLevel(int x, int y, int z, int level) {
+        long sec = secKeyOf(x, y, z);
+        DataLayer dl = localGetOrCreate(sec, ChunkPos.asLong(x >> 4, z >> 4));
+        dl.set(x & 15, y & 15, z & 15, level);
+        markAffected(x, y, z);
     }
 
-    // ==================== checkNode（移植自 BlockLightEngine L26-43）====================
+    // ==================== checkNode：移植自 BlockLightEngine L26-43 ====================
 
     private void checkNode(long packedPos) {
         IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
@@ -272,86 +333,82 @@ taskLocal.clear(); // 批次入口
         if (!localContains(sec)) return;
 
         mutablePos.set(bp.x, bp.y, bp.z);
-        BlockState state = getState(mutablePos);
-        int emission = getEmission(packedPos, state);
-        int cur = getStoredLevel(packedPos);
+        BlockState state = getState(bp.x, bp.y, bp.z);
+        int emission = getEmission(bp.x, bp.y, bp.z, state);
+        int cur = getStoredLevel(bp.x, bp.y, bp.z);
 
         if (emission < cur) {
-            setStoredLevel(packedPos, 0);
-            enqueueDecrease(packedPos, LightEngine.QueueEntry.decreaseAllDirections(cur));
+            setStoredLevel(bp.x, bp.y, bp.z, 0);
+            enqueueDecrease(bp.x, bp.y, bp.z, LightEngine.QueueEntry.decreaseAllDirections(cur));
         } else {
-            enqueueDecrease(packedPos, PULL_LIGHT_IN_ENTRY);
+            enqueueDecrease(bp.x, bp.y, bp.z, PULL_LIGHT_IN_ENTRY);
         }
         if (emission > 0) {
-            enqueueIncrease(packedPos,
+            enqueueIncrease(bp.x, bp.y, bp.z,
                     LightEngine.QueueEntry.increaseLightFromEmission(emission, isEmptyShape(state)));
         }
     }
 
-    // ==================== propagateIncrease（移植自 BlockLightEngine L46-79）====================
+    // ==================== propagateIncrease：移植自 BlockLightEngine L46-79 ====================
 
-    private void propagateIncrease(long packedPos, long queueEntry, int lightLevel) {
+    private void propagateIncrease(int srcX, int srcY, int srcZ, long queueEntry, int lightLevel) {
         BlockState blockstate = null;
-        IntBlockPos src = IntBlockPos.getBlockPos(packedPos);
 
         for (Direction dir : PROPAGATION_DIRECTIONS) {
             if (!LightEngine.QueueEntry.shouldPropagateInDirection(queueEntry, dir)) continue;
 
-            // C2：内联 BlockPos.offset——复用 src（省 offset 内部反查 + 反查 nPos 两次 CHM.get）
-            int nbpX = src.x + dir.getStepX();
-            int nbpY = src.y + dir.getStepY();
-            int nbpZ = src.z + dir.getStepZ();
-            long nPos = HashUtil.hashPos((long) nbpX, (long) nbpY, (long) nbpZ);
-            HashUtil.putBlock(nPos, new IntBlockPos(nbpX, nbpY, nbpZ));
+            // C2：内联 BlockPos.offset——src 坐标直接来自队列，免反查
+            int nbpX = srcX + dir.getStepX();
+            int nbpY = srcY + dir.getStepY();
+            int nbpZ = srcZ + dir.getStepZ();
             long nSec = HashUtil.hashSection((long) (nbpX >> 4), (long) (nbpY >> 4), (long) (nbpZ >> 4));
-            DataLayer ndl = localGet(nSec); // 按需建层：先 get，需要写时才 getOrCreate（消除传播白建空层积累）
+            DataLayer ndl = localGet(nSec); // 按需建层：先 get，需要写时才 getOrCreate，消除传播白建空层积累
             int nVal = ndl == null ? 0 : ndl.get(nbpX & 15, nbpY & 15, nbpZ & 15);
 
             int reduced = lightLevel - 1;
             if (reduced <= nVal) continue;
 
             mutablePos.set(nbpX, nbpY, nbpZ);
-            BlockState bs1 = getState(mutablePos);
+            BlockState bs1 = getState(nbpX, nbpY, nbpZ);
             int afterOpacity = lightLevel - getOpacity(bs1, mutablePos);
             if (afterOpacity <= nVal) continue;
+
+            // P1：不再 putBlock 注册——队列存坐标，无 side-channel 反查
 
             if (blockstate == null) {
                 blockstate = LightEngine.QueueEntry.isFromEmptyShape(queueEntry)
                         ? Blocks.AIR.defaultBlockState()
-                        : getState(mutablePos.set(src.x, src.y, src.z));
+                        : getState(srcX, srcY, srcZ);
             }
             // 形状检查跳过：仅当两方块都 isEmptyShape 才跳过。
             if (!(isEmptyShape(blockstate) && isEmptyShape(bs1))) {
-                if (shapeOccludes(packedPos, blockstate, nPos, bs1, dir)) continue;
+                if (shapeOccludes(srcX, srcY, srcZ, blockstate, nbpX, nbpY, nbpZ, bs1, dir)) continue;
             }
 
             if (ndl == null) {
                 ndl = localGetOrCreate(nSec, ChunkPos.asLong(nbpX >> 4, nbpZ >> 4));
             }
             ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, afterOpacity);
-            markAffected(nPos);
+            markAffected(nbpX, nbpY, nbpZ);
             if (afterOpacity > 1) {
-                enqueueIncrease(nPos, LightEngine.QueueEntry.increaseSkipOneDirection(
+                enqueueIncrease(nbpX, nbpY, nbpZ, LightEngine.QueueEntry.increaseSkipOneDirection(
                         afterOpacity, isEmptyShape(bs1), dir.getOpposite()));
             }
         }
     }
 
-    // ==================== propagateDecrease（移植自 BlockLightEngine L82-109）====================
+    // ==================== propagateDecrease：移植自 BlockLightEngine L82-109 ====================
 
-    private void propagateDecrease(long packedPos, long lightLevel) {
+    private void propagateDecrease(int srcX, int srcY, int srcZ, long lightLevel) {
         int fromLevel = LightEngine.QueueEntry.getFromLevel(lightLevel);
-        IntBlockPos src = IntBlockPos.getBlockPos(packedPos);
 
         for (Direction dir : PROPAGATION_DIRECTIONS) {
             if (!LightEngine.QueueEntry.shouldPropagateInDirection(lightLevel, dir)) continue;
 
-            // C2：内联 BlockPos.offset——复用 src（省 offset 内部反查 + 反查 nPos 两次 CHM.get）
-            int nbpX = src.x + dir.getStepX();
-            int nbpY = src.y + dir.getStepY();
-            int nbpZ = src.z + dir.getStepZ();
-            long nPos = HashUtil.hashPos((long) nbpX, (long) nbpY, (long) nbpZ);
-            HashUtil.putBlock(nPos, new IntBlockPos(nbpX, nbpY, nbpZ));
+            // C2：内联 BlockPos.offset——src 坐标直接来自队列，免反查
+            int nbpX = srcX + dir.getStepX();
+            int nbpY = srcY + dir.getStepY();
+            int nbpZ = srcZ + dir.getStepZ();
             long nSec = HashUtil.hashSection((long) (nbpX >> 4), (long) (nbpY >> 4), (long) (nbpZ >> 4));
             if (!localContains(nSec)) continue;
 
@@ -360,37 +417,38 @@ taskLocal.clear(); // 批次入口
             int nVal = ndl.get(nbpX & 15, nbpY & 15, nbpZ & 15);
             if (nVal == 0) continue;
 
+            // P1：不再 putBlock 注册——队列存坐标，无 side-channel 反查
+
             if (nVal <= fromLevel - 1) {
                 mutablePos.set(nbpX, nbpY, nbpZ);
-                BlockState state = getState(mutablePos);
-                int emission = getEmission(nPos, state);
+                BlockState state = getState(nbpX, nbpY, nbpZ);
+                int emission = getEmission(nbpX, nbpY, nbpZ, state);
                 ndl.set(nbpX & 15, nbpY & 15, nbpZ & 15, 0);
-                markAffected(nPos);
+                markAffected(nbpX, nbpY, nbpZ);
                 if (emission < nVal) {
-                    enqueueDecrease(nPos,
+                    enqueueDecrease(nbpX, nbpY, nbpZ,
                             LightEngine.QueueEntry.decreaseSkipOneDirection(nVal, dir.getOpposite()));
                 }
                 if (emission > 0) {
-                    enqueueIncrease(nPos,
+                    enqueueIncrease(nbpX, nbpY, nbpZ,
                             LightEngine.QueueEntry.increaseLightFromEmission(emission, isEmptyShape(state)));
                 }
             } else {
-                enqueueIncrease(nPos,
+                enqueueIncrease(nbpX, nbpY, nbpZ,
                         LightEngine.QueueEntry.increaseOnlyOneDirection(nVal, false, dir.getOpposite()));
             }
         }
     }
 
-    // ==================== emission（移植自 BlockLightEngine L111-114）====================
+    // ==================== emission：移植自 BlockLightEngine L111-114 ====================
 
-    private int getEmission(long packedPos, BlockState state) {
+    private int getEmission(int x, int y, int z, BlockState state) {
         int emission = state.getLightEmission(chunkSource.getLevel(), mutablePos);
-        IntBlockPos bp = IntBlockPos.getBlockPos(packedPos);
-        long sec = HashUtil.hashSection((long) (bp.x >> 4), (long) (bp.y >> 4), (long) (bp.z >> 4));
+        long sec = HashUtil.hashSection((long) (x >> 4), (long) (y >> 4), (long) (z >> 4));
         return emission > 0 && localContains(sec) ? emission : 0;
     }
 
-    // ==================== propagateLightSources（移植自 BlockLightEngine L117-126）====================
+    // ==================== propagateLightSources：移植自 BlockLightEngine L117-126 ====================
 
     @Override
     public void propagateLightSources(ChunkPos pos) {
@@ -399,7 +457,8 @@ taskLocal.clear(); // 批次入口
         if (lc != null) {
             lc.findBlockLightSources((blockPos, state) -> {
                 int emission = state.getLightEmission(chunkSource.getLevel(), blockPos);
-                enqueueIncrease(blockPos.asLong(),
+                // P1：免 asLong，即不注册——enqueue 直接带坐标
+                enqueueIncrease(blockPos.getX(), blockPos.getY(), blockPos.getZ(),
                         LightEngine.QueueEntry.increaseLightFromEmission(emission, isEmptyShape(state)));
             });
             }
@@ -410,9 +469,9 @@ taskLocal.clear(); // 批次入口
     public void updateSectionStatus(SectionPos pos, boolean isEmpty) {
         long chunkKey = ChunkPos.asLong(pos.x(), pos.z());
         if (isEmpty) {
-            // 不删层：层保留到 chunk 卸载（removeChunk 清理）。立即删层会让
+            // 不删层：层保留到 chunk 卸载，由 removeChunk 清理。立即删层会让
             // checkNode 的 localContains 早退 → decrease 不传播 → 相邻 section
-            // 光残留（打掉方块 section 变空场景，跨任务时序无法保证 checkNode 先于删层）。
+            // 光残留，打掉方块后 section 变空场景下，跨任务时序无法保证 checkNode 先于删层。
         } else {
             storage.getOrCreate(pos.asLong(), chunkKey);
         }
@@ -455,11 +514,62 @@ taskLocal.clear(); // 批次入口
 
     // ==================== 方块访问 ====================
 
-    private BlockState getState(BlockPos pos) {
-        int cx = pos.getX() >> 4;
-        int cz = pos.getZ() >> 4;
-        LightChunk lc = getChunk(cx, cz);
-        return lc == null ? Blocks.BEDROCK.defaultBlockState() : lc.getBlockState(pos);
+    /** M3/O1/P5：任务入口清 section 缓存，包括 2-slot 与任务内缓存，防跨任务读旧 section。 */
+    private void clearSectionCache() {
+        this.lastSecX1 = Integer.MIN_VALUE;
+        this.lastSecY1 = Integer.MIN_VALUE;
+        this.lastSecZ1 = Integer.MIN_VALUE;
+        this.lastSec1 = null;
+        this.lastSecX2 = Integer.MIN_VALUE;
+        this.lastSecY2 = Integer.MIN_VALUE;
+        this.lastSecZ2 = Integer.MIN_VALUE;
+        this.lastSec2 = null;
+        this.taskSections.clear();
+        this.lastKx = Integer.MIN_VALUE; // N2：secKey 缓存哨兵重置
+    }
+
+    // M3/O1：坐标版 getState + 2-slot section 缓存——传播调用点坐标已知，省 mutablePos + CHM.get 装箱。
+    private BlockState getState(int x, int y, int z) {
+        int sx = x >> 4, sy = y >> 4, sz = z >> 4;
+        LevelChunkSection s;
+        if (sx == this.lastSecX1 && sy == this.lastSecY1 && sz == this.lastSecZ1) {
+            s = this.lastSec1;
+        } else if (sx == this.lastSecX2 && sy == this.lastSecY2 && sz == this.lastSecZ2) {
+            s = this.lastSec2;
+        } else {
+            LightChunk lc = getChunk(sx, sz);
+            if (lc == null) {
+                return Blocks.BEDROCK.defaultBlockState();
+            }
+            // P5：先查任务内 section 缓存，fastutil 无装箱——CHM.get 只剩任务内首访
+            long secKey = HashUtil.hashSection((long) sx, (long) sy, (long) sz);
+            s = this.taskSections.get(secKey);
+            if (s == null) {
+                s = lc instanceof WindowedChunk wc ? wc.windowedAllSections().get(sy) : null;
+                if (s != null) { // 不缓存 null section，fastutil get null 有歧义且 null section 极少
+                    this.taskSections.put(secKey, s);
+                }
+            }
+            // LRU：旧 slot1 降级 slot2，新值进 slot1
+            this.lastSecX2 = this.lastSecX1;
+            this.lastSecY2 = this.lastSecY1;
+            this.lastSecZ2 = this.lastSecZ1;
+            this.lastSec2 = this.lastSec1;
+            this.lastSecX1 = sx;
+            this.lastSecY1 = sy;
+            this.lastSecZ1 = sz;
+            this.lastSec1 = s;
+        }
+        if (s != null) {
+            // N1：列掩码快路径——该行无方块即空气 → 直接 AIR 常量，免 palette 查找。
+            // columnMasksIfReady 不 rebuild：懒创建空 section 掩码 null → 走 palette。
+            short[] masks = ((com.inf.farlands.light.IColumnMasks) s).farlands$columnMasksIfReady();
+            if (masks != null && (masks[(x & 15) + (z & 15) * 16] & (1 << (y & 15))) == 0) {
+                return Blocks.AIR.defaultBlockState();
+            }
+            return s.getBlockState(x & 15, y & 15, z & 15);
+        }
+        return Blocks.BEDROCK.defaultBlockState();
     }
 
     private int getOpacity(BlockState state, BlockPos pos) {
@@ -470,15 +580,15 @@ taskLocal.clear(); // 批次入口
         return !state.canOcclude() || !state.useShapeForLightOcclusion();
     }
 
-    private boolean shapeOccludes(long pos1, BlockState state1, long pos2, BlockState state2, Direction dir) {
-        VoxelShape shape1 = getOcclusionShape(state1, pos1, dir);
-        VoxelShape shape2 = getOcclusionShape(state2, pos2, dir.getOpposite());
+    private boolean shapeOccludes(int x1, int y1, int z1, BlockState state1,
+            int x2, int y2, int z2, BlockState state2, Direction dir) {
+        VoxelShape shape1 = getOcclusionShape(state1, x1, y1, z1, dir);
+        VoxelShape shape2 = getOcclusionShape(state2, x2, y2, z2, dir.getOpposite());
         return Shapes.faceShapeOccludes(shape1, shape2);
     }
 
-    private VoxelShape getOcclusionShape(BlockState state, long pos, Direction dir) {
-        IntBlockPos bp = IntBlockPos.getBlockPos(pos);
-        mutablePos.set(bp.x, bp.y, bp.z);
+    private VoxelShape getOcclusionShape(BlockState state, int x, int y, int z, Direction dir) {
+        mutablePos.set(x, y, z);
         return LightEngine.getOcclusionShape(chunkSource.getLevel(), mutablePos, state, dir);
     }
 }

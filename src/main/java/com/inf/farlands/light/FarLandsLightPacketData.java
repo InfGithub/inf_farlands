@@ -14,7 +14,7 @@ import net.minecraft.world.level.chunk.DataLayer;
 /**
  * 光照数据包载荷，替代 vanilla 的 {@code ClientboundLightUpdatePacketData}。
  *
- * <p>每层按绝对 section Y 编码（VarInt + 2048 字节数组），而非 vanilla 的
+ * <p>每层按绝对 section Y 编码，编码为 VarInt + 2048 字节数组，而非 vanilla 的
  * {@code getMinLightSection() + index} 方案。
  */
 @SuppressWarnings({ "null" })

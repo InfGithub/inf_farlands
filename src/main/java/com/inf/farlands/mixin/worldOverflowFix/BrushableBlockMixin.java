@@ -10,8 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 考古方块（沙砾）tick 的 -64 高度检查（L94）——负极端 Y 无法下落。
- * javap 验证：tick 内 ServerLevel.getMinBuildHeight:()I 1 处。
+ * 沙砾考古方块 tick 的 -64 高度检查——负极端 Y 无法下落。
  */
 @Mixin(BrushableBlock.class)
 public abstract class BrushableBlockMixin {

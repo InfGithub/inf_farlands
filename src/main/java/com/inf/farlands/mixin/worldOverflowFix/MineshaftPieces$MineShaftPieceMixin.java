@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.util.WorldBounds;
 import java.lang.reflect.Field;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.BlockPos.MutableBlockPos;

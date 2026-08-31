@@ -2,7 +2,7 @@ package com.inf.farlands.client.compat.sodium;
 
 import com.inf.farlands.Config;
 import com.inf.farlands.InfFarlands;
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowedChunk;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -31,23 +31,23 @@ import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 /**
- * sodium 环境下的窗口跟随（§7.6 全视距）+ 集合一致性 + §7.3 滑出丢弃。
+ * sodium 环境下的窗口跟随，全视距 + 集合一致性 + 滑出丢弃。
  *
  * vanilla 下 ViewAreaMixin 每帧 moveWindowTo(相机Y)；sodium @Overwrite setupRender
  * 后 ViewArea.repositionCamera 不再被调用——客户端窗口只在包/setblock 滑窗时更新，
- * sodium 的 RenderSection 集合（ChunkTracker XZ 驱动）也不跟随垂直移动——纯 Y tp 后
+ * sodium 的 RenderSection 集合，ChunkTracker XZ 驱动，也不跟随垂直移动——纯 Y tp 后
  * 放置方块无法渲染。
  *
- * 每帧（RenderFrameEvent.Pre，主线程）遍历视距内全部已加载 chunk：
+ * 每帧 RenderFrameEvent.Pre，主线程，遍历视距内全部已加载 chunk：
  * 1. moveWindowTo(相机 sectionY)——buildWindow 早退，窗口不变零开销
- * 2. 窗口 vs 记录 Map<ChunkPos, Integer>：变化 → onChunkAdded（新窗口补齐，
- * sodium onSectionAdded 幂等）+ 滑出 sectionY 逐个 onSectionRemoved
- * （旧窗口 − 新窗口，防 sectionByPosition 无限累积——sodium 的树按 XZ
- * 管理，Y 残留无自动清理，极端 Y 往返会累积 GB 级）
- * 3. §7.3 丢弃检查（全视距，与 vanilla ViewArea 对称）
- * 4. 记录 Map retainAll 清理（卸载 chunk 条目）
+ * 2. 窗口 vs 记录 Map<ChunkPos, Integer>：变化 → onChunkAdded，新窗口补齐，
+ * sodium onSectionAdded 幂等 + 滑出 sectionY 逐个 onSectionRemoved，
+ * 旧窗口 − 新窗口，防 sectionByPosition 无限累积——sodium 的树按 XZ
+ * 管理，Y 残留无自动清理，极端 Y 往返会累积 GB 级
+ * 3. 丢弃检查，全视距，与 vanilla ViewArea 对称
+ * 4. 记录 Map retainAll 清理，卸载 chunk 条目
  *
- * 反射链全字符串（sodium 不在编译 classpath）；失败禁用（WARN 一次），功能退化不崩。
+ * 反射链全字符串，sodium 不在编译 classpath；失败禁用，WARN 一次，功能退化不崩。
  */
 public final class SodiumWindowSync {
 
@@ -63,10 +63,10 @@ public final class SodiumWindowSync {
     private static ClientLevel lastLevel;
     private static final Map<ChunkPos, Integer> lastWindowByChunk = new HashMap<>();
 
-    /** 每帧视距内已加载 chunk 的 vanilla 32-32 编码集合（原始类型，零对象分配）。 */
+    /** 每帧视距内已加载 chunk 的 vanilla 32-32 编码集合，原始类型，零对象分配。 */
     private static final LongOpenHashSet visited = new LongOpenHashSet(8192);
 
-    /** §7.3 丢弃触发：view 变化帧立即清 + 每 1 秒兜底（包到达使 hold 收缩时，区间外数据最长残留 1 秒）。 */
+    /** 丢弃触发：view 变化帧立即清 + 每 1 秒兜底，包到达使 hold 收缩时，区间外数据最长残留 1 秒。 */
     private static int lastDiscardViewMin = Integer.MIN_VALUE;
     private static int lastDiscardViewMax = Integer.MIN_VALUE;
     private static long lastDiscardTime;
@@ -142,7 +142,7 @@ public final class SodiumWindowSync {
 
                 WindowedChunk wc = (WindowedChunk) chunk;
                 wc.moveWindowTo(camSecY);
-                // §7.3 滑出丢弃（view 变化帧 + 每 20 帧兜底）
+                // 滑出丢弃，view 变化帧 + 每 20 帧兜底
                 if (discardNeeded) {
                     discardOutsideHoldBoundary(chunk);
                 }
@@ -171,7 +171,7 @@ public final class SodiumWindowSync {
             }
         }
 
-        // 清理记录：不在本次视距的 chunk（已卸载）
+        // 清理记录：视距外的 chunk，已卸载
         lastWindowByChunk.keySet().removeIf(p -> !visited.contains(encode(p)));
     }
 
@@ -183,21 +183,21 @@ public final class SodiumWindowSync {
             throws Exception {
         int oldMax = oldMin + Config.verticalSimulationDistance * 2;
         int newMax = newMin + Config.verticalSimulationDistance * 2;
-        // 下边界滑出（玩家上移）
+        // 玩家上移时下边界滑出
         for (int sy = oldMin; sy < newMin && sy <= oldMax; sy++) {
             mOnSectionRemoved.invoke(rsm, cx, sy, cz);
         }
-        // 上边界滑出（玩家下移）：起点限制在旧窗口内——tp 向下大跳时 newMax+1 远低于
-        // oldMin，无下限会遍历 [newMax+1, oldMax]（-2.14B 场景 1.34 亿次反射调用）冻结
+        // 上边界滑出，玩家下移：起点限制在旧窗口内——tp 向下大跳时 newMax+1 远低于
+        // oldMin，无下限会遍历 [newMax+1, oldMax]，-2.14B 场景 1.34 亿次反射调用，冻结
         for (int sy = Math.max(newMax + 1, oldMin); sy <= oldMax; sy++) {
             mOnSectionRemoved.invoke(rsm, cx, sy, cz);
         }
     }
 
     /**
-     * §7.3 滑出丢弃（sodium 版，修订同 ViewArea：丢弃参考 = 持有边界 ∪ 视图窗口并集）。
-     * 空 section 不丢（防懒创建循环）。onSectionRemoved 反射失败仅 WARN 不禁用——
-     * 窗口跟随（onChunkAdded）独立可用，丢弃降级为保守持有（内存略增，无碍）。
+     * 滑出丢弃，sodium 版，修订同 ViewArea：丢弃参考 = 持有边界与视图窗口并集。
+     * 空 section 不丢，防懒创建循环。onSectionRemoved 反射失败仅 WARN 不禁用——
+     * 窗口跟随 onChunkAdded 独立可用，丢弃降级为保守持有，内存略增，无碍。
      */
     @SuppressWarnings("null")
     private static void discardOutsideHoldBoundary(LevelChunk chunk) {
@@ -268,7 +268,7 @@ public final class SodiumWindowSync {
         }
     }
 
-    /** vanilla 32-32 无损编码（与 ChunkPos.asLong 同布局；手写以绕开其 side-channel）。 */
+    /** vanilla 32-32 无损编码：与 ChunkPos.asLong 同布局；手写以绕开其 side-channel。 */
     private static long encode(ChunkPos p) {
         return (long) p.x & 4294967295L | ((long) p.z & 4294967295L) << 32;
     }

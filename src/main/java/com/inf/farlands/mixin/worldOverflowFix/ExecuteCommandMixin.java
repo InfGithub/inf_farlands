@@ -13,13 +13,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 留档项 #1（XSpan 溢出）修复：/execute if blocks 的体积检查
- * （checkRegions L965 `getXSpan()*getYSpan()*getZSpan()`）在跨度 ≥ 2^31 时
- * int 溢出成负 → "i > 32768" 失效 → 40 亿次有限迭代卡顿。
+ * /execute if blocks 的体积检查 checkRegions
+ * `getXSpan()*getYSpan()*getZSpan()` 在跨度 ≥ 2^31 时 int 溢出成负 →
+ * "i > 32768" 失效 → 40 亿次有限迭代卡顿。
  *
- * 单轴跨度检查（数学：任一轴跨度 > limit ⇒ 体积 > limit，其他轴 ≥ 1）——
- * 与原版体积检查语义等价。long 算术（|(long)b − a| + 1）不溢出。
- * 原版检查保留（跨度 ≤ limit 时正常体积拒绝走原逻辑）。
+ * 单轴跨度检查：任一轴跨度 > limit 则 体积 > limit，其他轴 ≥ 1——
+ * 与原版体积检查语义等价。long 算术 |(long)b − a| + 1 不溢出。
+ * 原版检查保留：跨度 ≤ limit 时正常体积拒绝走原逻辑。
  */
 @Mixin(ExecuteCommand.class)
 public abstract class ExecuteCommandMixin {

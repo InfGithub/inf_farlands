@@ -3,7 +3,7 @@ package com.inf.farlands.mixin.worldOverflowFix;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.Inject;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.util.WorldBounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;

@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * 把 {@link FarLandsLightPacketData} 附加到 chunk-with-light 包上，
- * 使所有 section（不只 26 个）在一次原子写入中携带光照数据。
+ * 使所有 section 在一次原子写入中携带光照数据，不只 26 个。
  */
 @Mixin(ClientboundLevelChunkWithLightPacket.class)
 public class ClientboundLevelChunkWithLightPacketMixin {

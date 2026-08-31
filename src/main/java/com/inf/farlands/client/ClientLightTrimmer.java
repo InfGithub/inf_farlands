@@ -1,6 +1,6 @@
 package com.inf.farlands.client;
 
-import com.inf.farlands.HashUtil;
+import com.inf.farlands.util.HashUtil;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -29,6 +29,6 @@ public class ClientLightTrimmer {
         int pz = mc.player.blockPosition().getZ() >> 4;
         int range = mc.options.renderDistance().get() + 2;
 
-        HashUtil.sectionLookup.values().removeIf(sp -> Math.abs(sp.x - px) > range || Math.abs(sp.z - pz) > range);
+        HashUtil.sectionLookup.removeIf(sp -> Math.abs(sp.x - px) > range || Math.abs(sp.z - pz) > range);
     }
 }

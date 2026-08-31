@@ -10,10 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * 活塞 isPushable 的维度高度边界（L265/L276 getMinBuildHeight、
- * L266/L278 getMaxBuildHeight）——负极端 Y 活塞 isPushable 恒 false。
- * javap 验证：isPushable 内 Level.getMinBuildHeight:()I ×2、
- * Level.getMaxBuildHeight:()I ×2（每个 @Redirect 匹配同 target 全部调用）。
+ * 活塞 isPushable 的维度高度边界——负极端 Y 活塞 isPushable 恒 false。
  */
 @Mixin(PistonBaseBlock.class)
 public abstract class PistonBaseBlockMixin {

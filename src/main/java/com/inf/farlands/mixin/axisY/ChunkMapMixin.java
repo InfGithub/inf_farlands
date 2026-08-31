@@ -1,7 +1,7 @@
 package com.inf.farlands.mixin.axisY;
 
 import com.inf.farlands.Config;
-import com.inf.farlands.WindowSendState;
+import com.inf.farlands.window.WindowSendState;
 
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
@@ -81,7 +81,7 @@ public abstract class ChunkMapMixin {
         }
     }
 
-    /** updateChunkStatus 是 protected（同包 vanilla 可调），Mixin 跨包编译需反射。 */
+    /** updateChunkStatus 是 protected：同包 vanilla 可调，Mixin 跨包编译需反射。 */
     @Unique
     private static void lightUpdateChunkStatus(ThreadedLevelLightEngine le, ChunkPos pos) {
         try {
@@ -94,7 +94,7 @@ public abstract class ChunkMapMixin {
     @Shadow
     protected abstract List<ServerPlayer> getPlayers(ChunkPos chunkPos, boolean onlyPlayersWithChunkTracked);
 
-    // ---- 退出卡"保存世界中"修复（反射读 MinecraftServer.isSaving，无 public getter）----
+    // ---- 退出卡"保存世界中"修复：反射读 MinecraftServer.isSaving，无 public getter ----
 
     private static final Field F_IS_SAVING;
     static {
@@ -106,20 +106,20 @@ public abstract class ChunkMapMixin {
         }
     }
 
-    /** 保存关闭中（stopServer 置 isSaving=true）——该模式下强制卸载保存，不无限等待生成完成。 */
+    /** 保存关闭中：stopServer 置 isSaving=true——该模式下强制卸载保存，不无限等待生成完成。 */
     @Unique
     private static boolean isSavingMode(ServerLevel level) {
         try {
             return (Boolean) F_IS_SAVING.get(level.getServer());
         } catch (Exception e) {
-            return false; // 反射失败 → 非保存模式（保守，保持 vanilla 递归）
+            return false; // 反射失败 → 非保存模式，保守地保持 vanilla 递归
         }
     }
 
     /**
      * scheduleUnload 原版在 genRef 归零前无限递归重投 unloadQueue——genRef 归零依赖
-     * light/worldgen 完成链，退出时该链断（light 异步化后 worldgen 不再驱动挂起任务）→
-     * 主线程 100% CPU 卡"保存世界中"。isSaving（退出）模式下 genRef!=0 直接强制保存，
+     * light/worldgen 完成链，退出时该链断：light 异步化后 worldgen 不再驱动挂起任务 →
+     * 主线程 100% CPU 卡"保存世界中"。isSaving 退出模式下 genRef!=0 直接强制保存，
      * 不递归；正常游戏 isSaving=false 行为不变。
      */
     @SuppressWarnings("null")
@@ -132,6 +132,8 @@ public abstract class ChunkMapMixin {
                 ChunkAccess chunkaccess = chunkHolder.getLatestChunk();
                 if (this.pendingUnloads.remove(chunkPos, chunkHolder) && chunkaccess != null) {
                     if (chunkaccess instanceof LevelChunk levelchunk) {
+                        // fsa：卸载前写该 chunk 全部脏 section 到异步 IO 队列，数据落盘后 chunk 释放安全
+                        com.inf.farlands.serialize.SectionLifecycle.flushChunk(levelchunk);
                         levelchunk.setLoaded(false);
                         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new net.neoforged.neoforge.event.level.ChunkEvent.Unload(chunkaccess));
                     }
@@ -154,7 +156,7 @@ public abstract class ChunkMapMixin {
         });
     }
 
-    // 服务端窗口死状态（window.md §4.4）：不再在 mark 时 moveWindowTo，
+    // 服务端窗口死状态见 window.md §4.4：不再在 mark 时 moveWindowTo，
     // windowMinY 保持构造默认 -4——发送范围由 per-player ThreadLocal 决定。
 
     /**

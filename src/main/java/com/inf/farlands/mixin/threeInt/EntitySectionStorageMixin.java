@@ -9,9 +9,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.Unique;
 
-import com.inf.farlands.EntitySectionWindow;
-import com.inf.farlands.IntSectionPos;
-import com.inf.farlands.ServerEntitySectionStorage;
+import com.inf.farlands.window.EntitySectionWindow;
+import com.inf.farlands.util.IntSectionPos;
+import com.inf.farlands.window.ServerEntitySectionStorage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -37,7 +37,7 @@ import net.minecraft.world.phys.AABB;
 @Mixin(EntitySectionStorage.class)
 public abstract class EntitySectionStorageMixin<T extends EntityAccess> implements ServerEntitySectionStorage {
 
-    /** 服务端标记（PersistentEntitySectionManager 构造时置 true；客户端 Transient 不标记）。 */
+    /** 服务端标记：PersistentEntitySectionManager 构造时置 true，客户端 Transient 不标记。 */
     @Unique
     private boolean serverSide;
 
@@ -54,10 +54,10 @@ public abstract class EntitySectionStorageMixin<T extends EntityAccess> implemen
 
     /**
      * 新 section 初始 visibility 窗口感知。vanilla 继承 chunk 当前
-     * visibility（TICKING chunk 的新 section = TICKING，不经过 updateChunkStatus
-     * 过滤）——实体跨 section 移动/新实体加入时窗口外 section 会被错误地 ticking。
+     * visibility：TICKING chunk 的新 section = TICKING，不经过 updateChunkStatus
+     * 过滤——实体跨 section 移动/新实体加入时窗口外 section 会被错误地 ticking。
      * 创建时降级：TICKING + 窗口外 → TRACKED。
-     * （现有 onCreateSection @Inject TAIL 的 3int 索引保留，注入到覆盖后方法体）
+     * 现有 onCreateSection @Inject TAIL 的 3int 索引保留，注入到覆盖后方法体。
      */
     @Overwrite
     @SuppressWarnings({ "unchecked", "null" })

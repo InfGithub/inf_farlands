@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.axisY;
 
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowedChunk;
 
 import java.util.Arrays;
 import java.util.Collections;

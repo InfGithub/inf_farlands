@@ -1,9 +1,9 @@
 package com.inf.farlands.mixin.threeInt;
 
-import com.inf.farlands.HashUtil;
+import com.inf.farlands.util.HashUtil;
 import com.inf.farlands.InfFarlands;
-import com.inf.farlands.IntBlockPos;
-import com.inf.farlands.IntSectionPos;
+import com.inf.farlands.util.IntBlockPos;
+import com.inf.farlands.util.IntSectionPos;
 import it.unimi.dsi.fastutil.longs.LongConsumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -26,7 +26,7 @@ public abstract class SectionPosMixin {
         int y = ((SectionPos) (Object) this).y();
         int z = ((SectionPos) (Object) this).z();
         long key = HashUtil.hashSection((long) x, (long) y, (long) z);
-        HashUtil.putSection(key, new IntSectionPos(x, y, z));
+        HashUtil.putSection(key, x, y, z);
         return key;
     }
 
@@ -41,7 +41,7 @@ public abstract class SectionPosMixin {
     @Overwrite
     public static long asLong(int x, int y, int z) {
         long key = HashUtil.hashSection((long) x, (long) y, (long) z);
-        HashUtil.putSection(key, new IntSectionPos(x, y, z));
+        HashUtil.putSection(key, x, y, z);
         return key;
     }
 
@@ -114,7 +114,7 @@ public abstract class SectionPosMixin {
         IntSectionPos p = IntSectionPos.getSectionPos(packed);
         int nx = p.x + dx, ny = p.y + dy, nz = p.z + dz;
         long key = HashUtil.hashSection((long) nx, (long) ny, (long) nz);
-        HashUtil.putSection(key, new IntSectionPos(nx, ny, nz));
+        HashUtil.putSection(key, nx, ny, nz);
         return key;
     }
 
@@ -131,7 +131,7 @@ public abstract class SectionPosMixin {
         IntBlockPos bp = IntBlockPos.getBlockPos(levelPos);
         int sx = bp.x >> 4, sy = bp.y >> 4, sz = bp.z >> 4;
         long key = HashUtil.hashSection((long) sx, (long) sy, (long) sz);
-        HashUtil.putSection(key, new IntSectionPos(sx, sy, sz));
+        HashUtil.putSection(key, sx, sy, sz);
         return key;
     }
 
@@ -142,7 +142,7 @@ public abstract class SectionPosMixin {
     public static long getZeroNode(long packed) {
         IntSectionPos p = IntSectionPos.getSectionPos(packed);
         long key = HashUtil.hashSection((long) p.x, 0, (long) p.z);
-        HashUtil.putSection(key, new IntSectionPos(p.x, 0, p.z));
+        HashUtil.putSection(key, p.x, 0, p.z);
         return key;
     }
 
@@ -153,7 +153,7 @@ public abstract class SectionPosMixin {
     @Overwrite
     public static long getZeroNode(int x, int z) {
         long key = HashUtil.hashSection((long) x, 0, (long) z);
-        HashUtil.putSection(key, new IntSectionPos(x, 0, z));
+        HashUtil.putSection(key, x, 0, z);
         return key;
     }
 

@@ -15,9 +15,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 钳制模式虚拟面射线命中：开启且未按 shift 时，射线向下穿过虚拟面（当前 section 底）
- * → 返回指向面下格子的虚拟 BlockHitResult（direction=UP，放置到面上方）。
- * 同时记录虚拟命中位置（FarLandsVirtualHit）供选择框识别。
+ * 钳制模式虚拟面射线命中：开启且未按 shift 时，射线向下穿过当前 section 底处的虚拟面，
+ * 返回指向面下格子的虚拟 BlockHitResult，direction 为 UP，使放置落到面上方。
+ * 同时记录虚拟命中位置供选择框识别。
  */
 @Mixin(Entity.class)
 public class EntityPickMixin {
@@ -27,8 +27,8 @@ public class EntityPickMixin {
             CallbackInfoReturnable<HitResult> cir) {
         Entity self = (Entity) (Object) this;
         FarLandsVirtualHit.clear();
-        // 真实方块优先：原命中 BLOCK（clip 只命中非空气）→ 保留，不虚拟命中。
-        // 注意不能用 instanceof BlockHitResult——miss 也是 BlockHitResult（type=MISS），
+        // 真实方块优先：原命中 BLOCK 即保留，不虚拟命中，因为 clip 只命中非空气。
+        // 注意不能用 instanceof BlockHitResult——miss 也是 BlockHitResult，type 为 MISS，
         // 会把空气 miss 误判为真实方块而跳过虚拟命中。
         if (cir.getReturnValue() instanceof BlockHitResult bhr && bhr.getType() == HitResult.Type.BLOCK) {
             return;

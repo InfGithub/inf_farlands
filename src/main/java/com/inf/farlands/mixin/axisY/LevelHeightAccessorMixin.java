@@ -1,7 +1,7 @@
 package com.inf.farlands.mixin.axisY;
 
-import com.inf.farlands.WindowedChunk;
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.window.WindowedChunk;
+import com.inf.farlands.util.WorldBounds;
 
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.LevelHeightAccessor;

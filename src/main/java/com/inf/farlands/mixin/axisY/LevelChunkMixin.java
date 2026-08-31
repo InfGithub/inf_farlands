@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.axisY;
 
-import com.inf.farlands.WindowedChunk;
+import com.inf.farlands.window.WindowedChunk;
 
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
@@ -50,11 +50,11 @@ public abstract class LevelChunkMixin {
     }
 
     /**
-     * LevelChunk 构造 this() 参数里的 chunk.getSections()（ProtoChunk 窗口视图，
-     * 死状态 1 section）→ 改为从 allSections 按维度范围（ServerLevel 的
-     * getMinSection/getMaxSection = -4/20）构造完整数组。initAllSections 全量
-     * 转移 → BE 转移（构造器主体 L129）时 allSections 已完整（无 BE 的 chunk
-     * 同样完整——不依赖 BE 循环）。
+     * LevelChunk 构造 this() 参数里的 chunk.getSections() 是 ProtoChunk 窗口视图，
+     * 死状态下只有 1 个 section → 改为从 allSections 按维度范围构造完整数组：
+     * ServerLevel 的 getMinSection/getMaxSection = -4/20。initAllSections 全量
+     * 转移后，BE 转移在构造器主体 L129 执行，此时 allSections 已完整；无 BE 的
+     * chunk 同样完整，不依赖 BE 循环。
      */
     @Redirect(method = "<init>(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/level/chunk/ProtoChunk;Lnet/minecraft/world/level/chunk/LevelChunk$PostLoadProcessor;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/ProtoChunk;getSections()[Lnet/minecraft/world/level/chunk/LevelChunkSection;"))
     private static LevelChunkSection[] redirectGetSections(ProtoChunk chunk) {
@@ -123,7 +123,7 @@ public abstract class LevelChunkMixin {
                 LevelChunkSection s = new LevelChunkSection(getBiomeRegistry(ca));
                 s.read(buffer);
                 all.put(sectionY, s);
-                ca.getSection(ca.getSectionIndexFromSectionY(sectionY)); // 数组同步（get 内部 arr[idx]=s）
+                ca.getSection(ca.getSectionIndexFromSectionY(sectionY)); // 数组同步：get 内部执行 arr[idx]=s
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

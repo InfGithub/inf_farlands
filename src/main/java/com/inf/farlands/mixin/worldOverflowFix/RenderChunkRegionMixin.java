@@ -1,6 +1,6 @@
 package com.inf.farlands.mixin.worldOverflowFix;
 
-import com.inf.farlands.WorldBounds;
+import com.inf.farlands.util.WorldBounds;
 
 import net.minecraft.client.renderer.chunk.RenderChunkRegion;
 import net.minecraft.core.BlockPos;
@@ -22,22 +22,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * 防御编译取数时的溢出/越界 chunk 坐标。
  *
- * 世界边界允许方块铺到 z = Integer.MAX_VALUE（2147483647）。AO（环境光遮蔽）
+ * 世界边界允许方块铺到 z = Integer.MAX_VALUE = 2147483647。环境光遮蔽 AO
  * 编译时取该方块邻居 z+1 → int 溢出为 -2147483648 → chunk 坐标 -134217728
  * 之外的垃圾值 → RenderChunkRegion.index 越界 → CTD。
  *
- * chunk 坐标的合法范围 = 可玩范围 [-MAX_CHUNK, MAX_CHUNK-1]（缓冲 chunk =
- * MAX_CHUNK 与 ~MAX_CHUNK，覆盖 int 极值方块，不可用于正常逻辑）。
- * 越界（含溢出坐标）→ 返回空气/空值，
- * 语义与 vanilla 世界边界外一致（getAuxLightManager 返回 null 镜像
- * IBlockGetterExtension 默认实现：chunk 不存在时为 null）。
+ * chunk 坐标的合法范围 = 可玩范围 [-MAX_CHUNK, MAX_CHUNK-1]；缓冲 chunk =
+ * MAX_CHUNK 与 ~MAX_CHUNK，覆盖 int 极值方块，不可用于正常逻辑。
+ * 越界含溢出坐标 → 返回空气/空值，语义与 vanilla 世界边界外一致：
+ * getAuxLightManager 返回 null 镜像 IBlockGetterExtension 默认实现，
+ * chunk 不存在时为 null。
  */
 @Mixin(RenderChunkRegion.class)
 public abstract class RenderChunkRegionMixin {
 
     @Unique
     private boolean outOfChunkRange(int x, int z) {
-        // 缓冲 chunk（覆盖 int 极值方块）不可用，与 WorldBounds.inChunkRange 同语义
+        // 缓冲 chunk 覆盖 int 极值方块，不可用
         return !WorldBounds.inChunkRange(x, z);
     }
 

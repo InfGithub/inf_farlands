@@ -2,29 +2,35 @@ package com.inf.farlands.network;
 
 import java.util.List;
 
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.DataLayer;
 
 /**
- * 光照增量包（自定义，替代 vanilla ClientboundLightUpdatePacket）。
+ * 光照增量包，自定义，替代 vanilla ClientboundLightUpdatePacket。
  *
- * 绝对 sectionY（VarInt）编码，无 vanilla 的 minLightSection 范围限制
- * （ChunkHolder.sectionLightChanged 的 BitSet 索引在极端 Y 会内存爆炸，
- * 且范围 [-5,21] 挡掉极端 Y 增量）。
+ * 绝对 sectionY VarInt 编码，无 vanilla 的 minLightSection 范围限制：
+ * ChunkHolder.sectionLightChanged 的 BitSet 索引在极端 Y 会内存爆炸，
+ * 且范围 [-5,21] 挡掉极端 Y 增量。
  *
- * 数据三态（复用 FarLandsChunkDataPacket.encodeLight/decodeLight）：
- *   data == null  → 清空该 section 层（客户端 remove，getLightValue 恢复搜索语义）
- *   data == [v]   → 均匀层（1 字节）
+ * 维度字段：同 FarLandsChunkDataPacket——tp 跨维度在途旧包由接收端按维度丢弃。
+ *
+ * 数据三态，复用 FarLandsChunkDataPacket.encodeLight/decodeLight：
+ *   data == null  → 清空该 section 层，客户端 remove，getLightValue 恢复搜索语义
+ *   data == [v]   → 均匀层，1 字节
  *   data == [0xFF + 2048] → 完整层
  *
- * 发送端：ChunkHolderMixin.broadcastChanges（affected 收集自
- * ChunkHolder.sectionLightChanged @Inject RETURN，无范围检查）。
- * 接收端：InfFarlands.registerPayloads（queueSectionData + setSectionDirty）。
+ * 发送端：ChunkHolderMixin.broadcastChanges，affected 收集自
+ * ChunkHolder.sectionLightChanged @Inject RETURN，无范围检查。
+ * 接收端：InfFarlands.registerPayloads，queueSectionData + setSectionDirty。
  */
 public record FarLandsLightUpdatePacket(
+        ResourceKey<Level> dimension,
         int chunkX,
         int chunkZ,
         List<SectionLight> sky,
@@ -42,6 +48,7 @@ public record FarLandsLightUpdatePacket(
             FarLandsLightUpdatePacket::readFrom);
 
     public static void writeTo(FriendlyByteBuf buffer, FarLandsLightUpdatePacket pkt) {
+        buffer.writeResourceKey(pkt.dimension());
         buffer.writeInt(pkt.chunkX());
         buffer.writeInt(pkt.chunkZ());
         writeLayer(buffer, pkt.sky());
@@ -61,11 +68,12 @@ public record FarLandsLightUpdatePacket(
     }
 
     public static FarLandsLightUpdatePacket readFrom(FriendlyByteBuf buffer) {
+        ResourceKey<Level> dimension = buffer.readResourceKey(Registries.DIMENSION);
         int cx = buffer.readInt();
         int cz = buffer.readInt();
         List<SectionLight> sky = readLayer(buffer);
         List<SectionLight> block = readLayer(buffer);
-        return new FarLandsLightUpdatePacket(cx, cz, sky, block);
+        return new FarLandsLightUpdatePacket(dimension, cx, cz, sky, block);
     }
 
     private static List<SectionLight> readLayer(FriendlyByteBuf buffer) {
@@ -79,7 +87,7 @@ public record FarLandsLightUpdatePacket(
         return out;
     }
 
-    /** 供发送端（ChunkHolderMixin）复用：null/空层 → null（清空信号）。 */
+    /** 供发送端 ChunkHolderMixin 复用：null/空层 → null，清空信号。 */
     public static byte[] encodeSectionLight(DataLayer layer) {
         if (layer == null || layer.isEmpty()) {
             return null;
@@ -87,7 +95,7 @@ public record FarLandsLightUpdatePacket(
         return FarLandsChunkDataPacket.encodeLight(layer);
     }
 
-    /** 供接收端（InfFarlands handler）复用：null → null（客户端 remove）。 */
+    /** 供接收端 InfFarlands handler 复用：null → null，客户端 remove。 */
     public static DataLayer decodeSectionLight(byte[] data) {
         return data == null ? null : FarLandsChunkDataPacket.decodeLight(data);
     }
