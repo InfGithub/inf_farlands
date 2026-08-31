@@ -4,12 +4,10 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "debug/renderer/ChunkBorderRendererMixin",
-
     "debug/tool/clamp/EntityPickMixin",
     "debug/tool/clamp/KeyboardHandlerMixin",
     "debug/tool/clamp/LevelRendererMixin",
     "debug/tool/clamp/LocalPlayerMixin",
-
     "network/ClientboundCustomPayloadPacketMixin"
   ],
   "injectors": {

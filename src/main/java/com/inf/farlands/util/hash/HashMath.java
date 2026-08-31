@@ -1,7 +1,7 @@
 package com.inf.farlands.util.hash;
 
 public class HashMath {
-    public static long hashPos(long x, long y, long z) {
+    public static long hash(long x, long y, long z) {
         long xb = ((y & 0xFFFFFFFFL) << 32) | (z & 0xFFFFFFFFL);
         long ha = x & 0xFFFFFFFFL;
         ha ^= ha >>> 33;

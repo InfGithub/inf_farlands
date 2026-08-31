@@ -1,6 +1,6 @@
 package com.inf.farlands.util.pos;
 
-import com.inf.farlands.util.block.BlockUtil;
+import com.inf.farlands.util.maps.block.BlockUtil;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,7 +27,7 @@ public class IntBlockPos {
     }
 
     public static IntBlockPos getBlockPos(long key) {
-        IntBlockPos bp = BlockUtil.getBlock(key);
+        IntBlockPos bp = BlockUtil.get(key);
         if (bp != null) {
             return bp;
         }

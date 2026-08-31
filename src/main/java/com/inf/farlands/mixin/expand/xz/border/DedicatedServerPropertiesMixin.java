@@ -1,4 +1,4 @@
-package com.inf.farlands.mixin.expand.xz;
+package com.inf.farlands.mixin.expand.xz.border;
 
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
