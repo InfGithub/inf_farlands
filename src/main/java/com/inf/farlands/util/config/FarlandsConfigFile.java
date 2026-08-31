@@ -23,9 +23,9 @@ import java.util.Map;
  * <pre>{@code
  * {
  * "note": { "<lang>": "<text>", ... }, // 多语言注释
- * "time": <unixSeconds>, // 首次生成时间戳
+ * "lastWriteBackTime": <unixSeconds>, // 最后回写时间戳
  * "settings": {
- * "<entryName>": { "note": { ... }, "value": <literal> },
+ * "<entryName>": { "note": { ... }, "value": <literal>, "default": <literal> },
  * ...
  * }
  * }
@@ -37,16 +37,17 @@ public final class FarlandsConfigFile {
             .disableHtmlEscaping()
             .create();
     private static final String NOTE = "note";
-    private static final String TIME = "time";
+    private static final String LAST_WRITE_BACK_TIME = "lastWriteBackTime";
     private static final String SETTINGS = "settings";
     private static final String VALUE = "value";
+    private static final String DEFAULT = "default";
 
     private FarlandsConfigFile() {
     }
 
     /**
      * 加载配置文件，若不存在则生成默认；若存在则读值覆盖，缺键补默认回写。
-     * 空文件 / 纯空白视为无配置 → 重新生成默认。
+     * 空文件 / 纯空白视为无配置 -> 重新生成默认。
      */
     public static void load(Path file, Map<String, String> fileNotes,
             Map<String, ConfigEntry<?>> entries) {
@@ -58,8 +59,7 @@ public final class FarlandsConfigFile {
         try (Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             root = JsonParser.parseReader(r).getAsJsonObject();
         } catch (com.google.gson.JsonParseException e) {
-            // 空文件 / 非法 JSON：视为无配置，重新生成默认（不抛异常——用户手动清空
-            // 文件是合法的"重置"语义）。非空但损坏的 JSON 也走这里重置。
+            // 空文件 / 非法 JSON：视为无配置，重新生成默认。非空但损坏的 JSON 也走这里重置。
             write(file, fileNotes, entries, System.currentTimeMillis() / 1000L);
             return;
         } catch (IOException e) {
@@ -69,7 +69,7 @@ public final class FarlandsConfigFile {
         boolean[] dirty = { false };
         JsonObject settings = ensureSettings(root, file, dirty);
         if (dirty[0]) {
-            write(file, fileNotes, entries, root.get(TIME).getAsLong());
+            write(file, fileNotes, entries, root.get(LAST_WRITE_BACK_TIME).getAsLong());
             return; // 结构缺失重建后直接落盘，避免重复写
         }
 
@@ -85,23 +85,28 @@ public final class FarlandsConfigFile {
                 }
                 Object v = readValue(obj.get(VALUE), entry, file);
                 setValue(entry, v);
+                if (!obj.has(DEFAULT)) {
+                    obj.add(DEFAULT, toValueJson(entry.defaultValue(), entry.type()));
+                    dirty2[0] = true;
+                }
             } else {
                 JsonObject obj = new JsonObject();
                 obj.add(NOTE, toNotesJson(entry.notes()));
                 obj.add(VALUE, toValueJson(entry.defaultValue(), entry.type()));
+                obj.add(DEFAULT, toValueJson(entry.defaultValue(), entry.type()));
                 settings.add(name, obj);
                 dirty2[0] = true;
             }
         }
         if (dirty2[0]) {
-            write(file, fileNotes, entries, root.get(TIME).getAsLong());
+            write(file, fileNotes, entries, root.get(LAST_WRITE_BACK_TIME).getAsLong());
         }
     }
 
-    /** settings/time 键存在校验；缺失则补并标记。 */
+    /** settings/lastWriteBackTime 键存在校验；缺失则补并标记。 */
     private static JsonObject ensureSettings(JsonObject root, Path file, boolean[] dirty) {
-        if (!root.has(TIME)) {
-            root.addProperty(TIME, System.currentTimeMillis() / 1000L);
+        if (!root.has(LAST_WRITE_BACK_TIME)) {
+            root.addProperty(LAST_WRITE_BACK_TIME, System.currentTimeMillis() / 1000L);
             dirty[0] = true;
         }
         if (!root.has(SETTINGS) || !root.get(SETTINGS).isJsonObject()) {
@@ -114,15 +119,16 @@ public final class FarlandsConfigFile {
     // 写文件
 
     private static void write(Path file, Map<String, String> fileNotes,
-            Map<String, ConfigEntry<?>> entries, long time) {
+            Map<String, ConfigEntry<?>> entries, long lastWriteBackTime) {
         JsonObject root = new JsonObject();
         root.add(NOTE, toNotesJson(fileNotes));
-        root.addProperty(TIME, time);
+        root.addProperty(LAST_WRITE_BACK_TIME, lastWriteBackTime);
         JsonObject settings = new JsonObject();
         for (Map.Entry<String, ConfigEntry<?>> e : entries.entrySet()) {
             JsonObject obj = new JsonObject();
             obj.add(NOTE, toNotesJson(e.getValue().notes()));
             obj.add(VALUE, toValueJson(e.getValue().defaultValue(), e.getValue().type()));
+            obj.add(DEFAULT, toValueJson(e.getValue().defaultValue(), e.getValue().type()));
             settings.add(e.getKey(), obj);
         }
         root.add(SETTINGS, settings);
