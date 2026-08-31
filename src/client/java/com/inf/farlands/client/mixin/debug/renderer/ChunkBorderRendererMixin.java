@@ -98,7 +98,7 @@ public class ChunkBorderRendererMixin {
     private static final int RED = 0xFFFF0000;
     private static final int YELLOW = 0xFFFFFF00;
     private static final int BLUE = 0xFF0000FF;
-    private static final int WHITE = 0xFFFFFFF;
+    private static final int WHITE = 0xFFFFFFFF;
 
     @Inject(method = "emitGizmos", at = @At("HEAD"), cancellable = true)
     private void emitGizmos(
