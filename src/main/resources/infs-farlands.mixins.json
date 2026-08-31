@@ -7,6 +7,8 @@
     "debug/tool/clamp/EntityCollisionMixin",
     "debug/tool/clamp/ServerPlayerMixin",
 
+    "expand/xyz/pos/Aquifer$NoiseBasedAquiferMixin",
+
     "expand/xz/border/DedicatedServerPropertiesMixin",
     "expand/xz/border/DimensionTypeMixin",
     "expand/xz/border/EntityMixin",
