@@ -32,6 +32,11 @@
     "expand/xz/border/WorldBorderCommandMixin",
     "expand/xz/border/WorldBorderMixin",
 
+    "fix/xz/AABBMixin",
+    "fix/xz/BoundingBoxMixin",
+    "fix/xz/MineshaftPieces$MineShaftCorridorMixin",
+    "fix/xz/MineshaftStructureMixin",
+
     "network/ClientboundCustomPayloadPacketMixin",
     "network/ServerboundCustomPayloadPacketMixin",
 

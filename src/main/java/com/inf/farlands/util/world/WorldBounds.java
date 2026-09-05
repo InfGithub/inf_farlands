@@ -5,31 +5,20 @@ import com.inf.farlands.FarlandsConstant;
 
 /**
  * 边界统一语义。
- *
- * 可玩范围供正常逻辑使用：
- * block XZ: [MIN_PLAYABLE_BLOCK, MAX_PLAYABLE_BLOCK] = [-MAX_BLOCK,
- * MAX_BLOCK-1]
- * chunk: [MIN_PLAYABLE_CHUNK, MAX_PLAYABLE_CHUNK] = [-MAX_CHUNK, MAX_CHUNK-1]
- * Y: [worldGenMinY, worldGenMaxY)
- *
- * 缓冲带不可用于正常逻辑，各 16 格 = 恰好一个整 chunk：
- * 正侧 [MAX_BLOCK, MAX_BLOCK+15] = chunk MAX_CHUNK
- * 负侧 [Integer.MIN_VALUE, ~MAX_BLOCK] = chunk ~MAX_CHUNK
- *
  */
 public final class WorldBounds {
     private WorldBounds() {
     }
 
     /** 正方向最后一个可玩方块 = 2,147,483,631 = 2^31-17。 */
-    public static final int MAX_PLAYABLE_BLOCK = FarlandsConstant.MAX_BLOCK - 1;
+    public static final int MAX_PLAYABLE_BLOCK = FarlandsConstant.MAX_PLAYABLE_BLOCK;
 
-    public static final int MIN_PLAYABLE_BLOCK = -FarlandsConstant.MAX_BLOCK;
+    public static final int MIN_PLAYABLE_BLOCK = ~FarlandsConstant.MAX_PLAYABLE_BLOCK;
 
     /** 正方向最后一个可玩 chunk = 134,217,726 = 2^27-2。 */
-    public static final int MAX_PLAYABLE_CHUNK = FarlandsConstant.MAX_CHUNK - 1;
+    public static final int MAX_PLAYABLE_CHUNK = FarlandsConstant.MAX_PLAYABLE_CHUNK;
 
-    public static final int MIN_PLAYABLE_CHUNK = -FarlandsConstant.MAX_CHUNK;
+    public static final int MIN_PLAYABLE_CHUNK = ~FarlandsConstant.MAX_PLAYABLE_CHUNK;
 
     public static boolean inBlock(int v) {
         return v >= MIN_PLAYABLE_BLOCK && v <= MAX_PLAYABLE_BLOCK;

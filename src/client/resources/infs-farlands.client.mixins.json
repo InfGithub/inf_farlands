@@ -9,6 +9,9 @@
     "debug/tool/clamp/LevelRendererMixin",
     "debug/tool/clamp/LocalPlayerMixin",
     "expand/xyz/pos/LightDebugRendererMixin",
+    "fix/xz/EntityRendererMixin",
+    "fix/xz/LevelRendererMixin",
+    "fix/xz/WeatherEffectRendererMixin",
     "network/ClientboundCustomPayloadPacketMixin"
   ],
   "injectors": {

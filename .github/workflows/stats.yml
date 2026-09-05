@@ -1,0 +1,73 @@
+name: Update Stats Badges
+
+on:
+  push:
+    branches: [fabric-26.1.2]
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run source stats
+        id: stats
+        run: |
+          bash .github/scripts/stats.sh src > /tmp/stats.out
+          cat /tmp/stats.out >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: @Overwrite badge
+        uses: runarberg/dynamic-badges-action@master
+        with:
+          gist-token: ${{ secrets.GH_TOKEN }}
+          gist-id: dc5cf49ced449ef6cda0c106718f8e53
+          gist-file-name: overwrite.json
+          label: '@Overwrite'
+          message: ${{ steps.stats.outputs.overwrite }}
+          color: red
+
+      - name: @Inject badge
+        uses: runarberg/dynamic-badges-action@master
+        with:
+          gist-token: ${{ secrets.GH_TOKEN }}
+          gist-id: dc5cf49ced449ef6cda0c106718f8e53
+          gist-file-name: inject.json
+          label: '@Inject'
+          message: ${{ steps.stats.outputs.inject }}
+          color: green
+
+      - name: @Redirect badge
+        uses: runarberg/dynamic-badges-action@master
+        with:
+          gist-token: ${{ secrets.GH_TOKEN }}
+          gist-id: dc5cf49ced449ef6cda0c106718f8e53
+          gist-file-name: redirect.json
+          label: '@Redirect'
+          message: ${{ steps.stats.outputs.redirect }}
+          color: blue
+
+      - name: Field badge
+        uses: runarberg/dynamic-badges-action@master
+        with:
+          gist-token: ${{ secrets.GH_TOKEN }}
+          gist-id: dc5cf49ced449ef6cda0c106718f8e53
+          gist-file-name: field.json
+          label: 'Field'
+          message: ${{ steps.stats.outputs.field }}
+          color: black
+
+      - name: Method badge
+        uses: runarberg/dynamic-badges-action@master
+        with:
+          gist-token: ${{ secrets.GH_TOKEN }}
+          gist-id: dc5cf49ced449ef6cda0c106718f8e53
+          gist-file-name: method.json
+          label: 'Method'
+          message: ${{ steps.stats.outputs.method }}
+          color: white
