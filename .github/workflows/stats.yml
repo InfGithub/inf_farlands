@@ -23,51 +23,51 @@ jobs:
         shell: bash
 
       - name: "@Overwrite badge"
-        uses: runarberg/dynamic-badges-action@master
+        uses: schneegans/dynamic-badges-action@v1.6.0
         with:
-          gist-token: ${{ secrets.GH_TOKEN }}
-          gist-id: dc5cf49ced449ef6cda0c106718f8e53
-          gist-file-name: overwrite.json
+          auth: ${{ secrets.GH_TOKEN }}
+          gistID: dc5cf49ced449ef6cda0c106718f8e53
+          filename: overwrite.json
           label: '@Overwrite'
           message: ${{ steps.stats.outputs.overwrite }}
           color: red
 
       - name: "@Inject badge"
-        uses: runarberg/dynamic-badges-action@master
+        uses: schneegans/dynamic-badges-action@v1.6.0
         with:
-          gist-token: ${{ secrets.GH_TOKEN }}
-          gist-id: dc5cf49ced449ef6cda0c106718f8e53
-          gist-file-name: inject.json
+          auth: ${{ secrets.GH_TOKEN }}
+          gistID: dc5cf49ced449ef6cda0c106718f8e53
+          filename: inject.json
           label: '@Inject'
           message: ${{ steps.stats.outputs.inject }}
           color: green
 
       - name: "@Redirect badge"
-        uses: runarberg/dynamic-badges-action@master
+        uses: schneegans/dynamic-badges-action@v1.6.0
         with:
-          gist-token: ${{ secrets.GH_TOKEN }}
-          gist-id: dc5cf49ced449ef6cda0c106718f8e53
-          gist-file-name: redirect.json
+          auth: ${{ secrets.GH_TOKEN }}
+          gistID: dc5cf49ced449ef6cda0c106718f8e53
+          filename: redirect.json
           label: '@Redirect'
           message: ${{ steps.stats.outputs.redirect }}
           color: blue
 
       - name: Field badge
-        uses: runarberg/dynamic-badges-action@master
+        uses: schneegans/dynamic-badges-action@v1.6.0
         with:
-          gist-token: ${{ secrets.GH_TOKEN }}
-          gist-id: dc5cf49ced449ef6cda0c106718f8e53
-          gist-file-name: field.json
+          auth: ${{ secrets.GH_TOKEN }}
+          gistID: dc5cf49ced449ef6cda0c106718f8e53
+          filename: field.json
           label: 'Field'
           message: ${{ steps.stats.outputs.field }}
           color: black
 
       - name: Method badge
-        uses: runarberg/dynamic-badges-action@master
+        uses: schneegans/dynamic-badges-action@v1.6.0
         with:
-          gist-token: ${{ secrets.GH_TOKEN }}
-          gist-id: dc5cf49ced449ef6cda0c106718f8e53
-          gist-file-name: method.json
+          auth: ${{ secrets.GH_TOKEN }}
+          gistID: dc5cf49ced449ef6cda0c106718f8e53
+          filename: method.json
           label: 'Method'
           message: ${{ steps.stats.outputs.method }}
           color: white
