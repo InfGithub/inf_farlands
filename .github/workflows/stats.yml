@@ -22,7 +22,7 @@ jobs:
           cat /tmp/stats.out >> "$GITHUB_OUTPUT"
         shell: bash
 
-      - name: @Overwrite badge
+      - name: "@Overwrite badge"
         uses: runarberg/dynamic-badges-action@master
         with:
           gist-token: ${{ secrets.GH_TOKEN }}
@@ -32,7 +32,7 @@ jobs:
           message: ${{ steps.stats.outputs.overwrite }}
           color: red
 
-      - name: @Inject badge
+      - name: "@Inject badge"
         uses: runarberg/dynamic-badges-action@master
         with:
           gist-token: ${{ secrets.GH_TOKEN }}
@@ -42,7 +42,7 @@ jobs:
           message: ${{ steps.stats.outputs.inject }}
           color: green
 
-      - name: @Redirect badge
+      - name: "@Redirect badge"
         uses: runarberg/dynamic-badges-action@master
         with:
           gist-token: ${{ secrets.GH_TOKEN }}
