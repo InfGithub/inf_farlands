@@ -15,10 +15,20 @@ import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;
 
 /**
- * 缓冲带/超 chunk 域 chunk 跳过 applyCarvers 与 spawnOriginalMobs。
+ * 缓冲带/超 chunk 域 chunk 跳过 buildSurface、applyCarvers 与 spawnOriginalMobs。
  */
 @Mixin(NoiseBasedChunkGenerator.class)
 public abstract class NoiseBasedChunkGeneratorMixin {
+
+    @Inject(method = "buildSurface(Lnet/minecraft/server/level/WorldGenRegion;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/chunk/ChunkAccess;)V", at = @At("HEAD"), cancellable = true)
+    private void skipBuildSurface(WorldGenRegion level, StructureManager structureManager,
+            RandomState randomState, ChunkAccess chunk, CallbackInfo ci) {
+        int cx = chunk.getPos().x();
+        int cz = chunk.getPos().z();
+        if (!WorldBounds.inChunkRange(cx, cz)) {
+            ci.cancel();
+        }
+    }
 
     @Inject(method = "applyCarvers", at = @At("HEAD"), cancellable = true)
     private void skipApplyCarvers(WorldGenRegion level, long seed, RandomState randomState,
