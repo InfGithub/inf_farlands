@@ -23,7 +23,7 @@ jobs:
         shell: bash
 
       - name: "@Overwrite badge"
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: Schneegans/dynamic-badges-action@master
         with:
           auth: ${{ secrets.GH_TOKEN }}
           gistID: dc5cf49ced449ef6cda0c106718f8e53
@@ -33,7 +33,7 @@ jobs:
           color: red
 
       - name: "@Inject badge"
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: Schneegans/dynamic-badges-action@master
         with:
           auth: ${{ secrets.GH_TOKEN }}
           gistID: dc5cf49ced449ef6cda0c106718f8e53
@@ -43,7 +43,7 @@ jobs:
           color: green
 
       - name: "@Redirect badge"
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: Schneegans/dynamic-badges-action@master
         with:
           auth: ${{ secrets.GH_TOKEN }}
           gistID: dc5cf49ced449ef6cda0c106718f8e53
@@ -53,7 +53,7 @@ jobs:
           color: blue
 
       - name: Field badge
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: Schneegans/dynamic-badges-action@master
         with:
           auth: ${{ secrets.GH_TOKEN }}
           gistID: dc5cf49ced449ef6cda0c106718f8e53
@@ -63,7 +63,7 @@ jobs:
           color: black
 
       - name: Method badge
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: Schneegans/dynamic-badges-action@master
         with:
           auth: ${{ secrets.GH_TOKEN }}
           gistID: dc5cf49ced449ef6cda0c106718f8e53
