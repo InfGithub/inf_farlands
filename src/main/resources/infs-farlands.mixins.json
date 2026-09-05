@@ -34,8 +34,19 @@
 
     "fix/xz/AABBMixin",
     "fix/xz/BoundingBoxMixin",
+    "fix/xz/ChunkGeneratorMixin",
+    "fix/xz/CloneCommandsMixin",
+    "fix/xz/ExecuteCommandMixin",
+    "fix/xz/GroundPathNavigationMixin",
     "fix/xz/MineshaftPieces$MineShaftCorridorMixin",
+    "fix/xz/MineshaftPieces$MineShaftPieceMixin",
     "fix/xz/MineshaftStructureMixin",
+    "fix/xz/NoiseBasedChunkGeneratorMixin",
+    "fix/xz/ScatteredFeaturePieceMixin",
+    "fix/xz/VoxelShapeMixin",
+    "fix/xz/WalkNodeEvaluatorMixin",
+
+    "fix/y/LevelMixin",
 
     "network/ClientboundCustomPayloadPacketMixin",
     "network/ServerboundCustomPayloadPacketMixin",

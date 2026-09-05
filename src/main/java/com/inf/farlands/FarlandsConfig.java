@@ -27,10 +27,20 @@ public class FarlandsConfig {
             Map.of("en_us", "Maximum absolute Y for world generation", "zh_cn", "世界生成的绝对最大 Y"));
     public static final int worldGenMaxY;
 
+    // ---- 通用循环上限 ----
+
+    public static final ConfigEntry<Integer> MAX_CAP_ITER = Config.register(
+            "maxCapIter",
+            int.class,
+            512,
+            Map.of("en_us", "Iteration/search cap for extreme-Y loops", "zh_cn", "极端 Y 循环的迭代/搜索上限"));
+    public static final int maxCapIter;
+
     static {
         Config.init();
         borderAbsoluteMax = BORDER_ABSOLUTE_MAX.get();
         worldGenMinY = WORLD_GEN_MIN_Y.get();
         worldGenMaxY = WORLD_GEN_MAX_Y.get();
+        maxCapIter = MAX_CAP_ITER.get();
     }
 }
