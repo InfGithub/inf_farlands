@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# Inf's Farlands 源码统计——输出 5 个 badge 计数（key=value 到 stdout）。
+# Inf's Farlands 源码统计。
 #
-# 统计范围：src/main/java + src/client/java（排除根目录工具类）。
-# 规则：
-#   @Overwrite / @Inject / @Redirect —— 行首注解（^\s*@X），排除注释/javadoc 提及。
-#   Field / Method —— 反射句柄缓存：`final Field/Method` 类型变量声明，
-#                     实例与静态 final 都计（当前未移植模块，值 0，随移植增长）。
+# 统计范围：src/main/java + src/client/java。
 set -euo pipefail
 
 SRC="${1:-src}"
